@@ -57,6 +57,7 @@ interface WhiteStore {
   showMarkov: boolean;
   showBookmarks: boolean;
   showDomainRules: boolean;
+  showStats: boolean;
   // Reading Mode
   preview: { item: SearchResultItem; data: PreviewData | null; loading: boolean; error: string | null } | null;
   // j/k navigation
@@ -81,11 +82,12 @@ interface WhiteStore {
   setShowMarkov: (b: boolean) => void;
   setShowBookmarks: (b: boolean) => void;
   setShowDomainRules: (b: boolean) => void;
+  setShowStats: (b: boolean) => void;
   setDomainRules: (r: DomainRule[]) => void;
   setDomainRule: (host: string, action: DomainAction) => void;
   removeDomainRule: (host: string) => void;
   setPreview: (p: WhiteStore["preview"]) => void;
-  setFocusedIndex: (i: number) => void;
+  setFocusedIndex: (i: number | ((prev: number) => number)) => void;
 
   resetToHome: () => void;
 }
@@ -111,6 +113,7 @@ export const useWhite = create<WhiteStore>((set, get) => ({
   showMarkov: false,
   showBookmarks: false,
   showDomainRules: false,
+  showStats: false,
   preview: null,
   focusedIndex: -1,
 
@@ -146,6 +149,7 @@ export const useWhite = create<WhiteStore>((set, get) => ({
   setShowMarkov: (b) => set({ showMarkov: b }),
   setShowBookmarks: (b) => set({ showBookmarks: b }),
   setShowDomainRules: (b) => set({ showDomainRules: b }),
+  setShowStats: (b) => set({ showStats: b }),
   setDomainRules: (r) =>
     set({
       domainRules: r,
@@ -171,7 +175,10 @@ export const useWhite = create<WhiteStore>((set, get) => ({
       };
     }),
   setPreview: (p) => set({ preview: p }),
-  setFocusedIndex: (i) => set({ focusedIndex: i }),
+  setFocusedIndex: (i) =>
+    set((s) => ({
+      focusedIndex: typeof i === "function" ? (i as (prev: number) => number)(s.focusedIndex) : i,
+    })),
 
   resetToHome: () => set({ view: "home", query: "", suggestions: [], preview: null, focusedIndex: -1 }),
 }));

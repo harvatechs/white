@@ -23,6 +23,8 @@ const SHORTCUTS: { keys: string[]; label: string; group: string }[] = [
   { keys: ["g", "b"], label: "Open Bookmarks", group: "Navigation" },
   { keys: ["g", "m"], label: "Open Markov Inspector", group: "Navigation" },
   { keys: ["g", "d"], label: "Open Domain ranking", group: "Navigation" },
+  { keys: ["g", "t"], label: "Open Search stats", group: "Navigation" },
+  { keys: ["s"], label: "Summarize current page (in Reading Mode)", group: "Results" },
 ];
 
 function Kbd({ children }: { children: React.ReactNode }) {

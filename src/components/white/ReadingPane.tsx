@@ -1,22 +1,48 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ExternalLink, Loader2, BookOpen, Clock, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
+import {
+  X,
+  ExternalLink,
+  Loader2,
+  BookOpen,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
+  Sparkles,
+  FileText,
+  List,
+} from "lucide-react";
 import { useWhite } from "@/lib/store";
 import type { SearchResultItem } from "@/lib/types";
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 
 interface ReadingPaneProps {
   items: SearchResultItem[];
   onNavigate: (item: SearchResultItem) => void;
 }
 
+type ViewMode = "article" | "summary";
+
 export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
   const preview = useWhite((s) => s.preview);
   const setPreview = useWhite((s) => s.setPreview);
-  const prefs = useWhite((s) => s.prefs);
+
+  const [view, setView] = useState<ViewMode>("article");
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const close = useCallback(() => setPreview(null), [setPreview]);
+
+  // reset summary state when item changes
+  useEffect(() => {
+    setView("article");
+    setSummary(null);
+    setSummaryError(null);
+    setSummaryLoading(false);
+  }, [preview?.item?.url]);
 
   // load preview when item changes
   useEffect(() => {
@@ -63,11 +89,35 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
       } else if (e.key === "Escape") {
         e.preventDefault();
         close();
+      } else if (e.key === "s" && !preview.loading && preview.data) {
+        e.preventDefault();
+        if (!summary && !summaryLoading) fetchSummary();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [preview, items, onNavigate, close]);
+  }, [preview, items, onNavigate, close, summary, summaryLoading]);
+
+  const fetchSummary = async () => {
+    if (!preview?.item || summaryLoading) return;
+    setSummaryLoading(true);
+    setSummaryError(null);
+    setView("summary");
+    try {
+      const r = await fetch(`/api/summarize?url=${encodeURIComponent(preview.item.url)}`);
+      const d = await r.json();
+      if (d.error) {
+        setSummaryError(d.error);
+        setSummary(null);
+      } else {
+        setSummary(d.summary);
+      }
+    } catch {
+      setSummaryError("Failed to generate summary.");
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -94,7 +144,7 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
             aria-label="Reading preview"
           >
             {/* header */}
-            <header className="flex items-center gap-2 px-5 py-4 ws-hairline-b">
+            <header className="flex items-center gap-2 px-5 py-3.5 ws-hairline-b">
               <button
                 type="button"
                 onClick={() => {
@@ -147,6 +197,40 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
               </button>
             </header>
 
+            {/* view toggle (article / summary) */}
+            {!preview.loading && preview.data && (
+              <div className="flex items-center gap-1 px-5 py-2 ws-hairline-b">
+                <div className="ws-segmented">
+                  <button
+                    type="button"
+                    data-active={view === "article"}
+                    onClick={() => setView("article")}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <FileText className="size-3.5" strokeWidth={1.75} />
+                    Article
+                  </button>
+                  <button
+                    type="button"
+                    data-active={view === "summary"}
+                    onClick={() => {
+                      if (!summary && !summaryLoading) fetchSummary();
+                      setView("summary");
+                    }}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <Sparkles className="size-3.5" strokeWidth={1.75} />
+                    Summary
+                  </button>
+                </div>
+                {summary && view === "summary" && (
+                  <span className="ml-auto ws-pill" style={{ opacity: 0.6 }}>
+                    <List className="size-3" /> AI-generated
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* body */}
             <div className="ws-scroll flex-1 overflow-y-auto px-6 py-6">
               {preview.loading && (
@@ -175,7 +259,8 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
                 </div>
               )}
 
-              {!preview.loading && preview.data && (
+              {/* ARTICLE VIEW */}
+              {!preview.loading && preview.data && view === "article" && (
                 <article className="ws-fade-up">
                   <h1 className="text-[22px] font-semibold leading-tight tracking-tight">
                     {preview.data.title || preview.item?.name}
@@ -195,7 +280,7 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
                     <span>{preview.data.wordCount.toLocaleString()} words</span>
                   </div>
 
-                  <div className="mt-5 whitespace-pre-wrap break-words text-[15px] leading-[1.75] text-foreground/80">
+                  <div className="mt-5 whitespace-pre-wrap break-words text-[15px] leading-[1.8] text-foreground/80">
                     {preview.data.text}
                   </div>
 
@@ -217,11 +302,97 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
                   )}
                 </article>
               )}
+
+              {/* SUMMARY VIEW */}
+              {!preview.loading && preview.data && view === "summary" && (
+                <div className="ws-fade-up">
+                  {summaryLoading && (
+                    <div className="flex flex-col items-center justify-center py-16">
+                      <Loader2 className="size-6 animate-spin mb-3" style={{ color: "var(--ws-accent)" }} />
+                      <p className="text-[13px] text-foreground/50">Generating a clean summary…</p>
+                      <p className="mt-1 text-[11px] text-foreground/35">Powered by WHITE&rsquo;s LLM · no tracking</p>
+                    </div>
+                  )}
+
+                  {!summaryLoading && summaryError && (
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <AlertCircle className="size-7 mb-3" style={{ color: "var(--destructive)" }} strokeWidth={1.5} />
+                      <p className="text-[14px] font-medium">Couldn&rsquo;t summarize this page</p>
+                      <p className="mt-1 text-[12.5px] text-foreground/50">{summaryError}</p>
+                      <button
+                        type="button"
+                        onClick={fetchSummary}
+                        className="mt-4 inline-flex items-center gap-1.5 rounded-lg ws-hairline px-3 py-2 text-[12.5px] font-medium hover:ws-whisper transition-colors"
+                      >
+                        <Sparkles className="size-3.5" strokeWidth={1.75} />
+                        Try again
+                      </button>
+                    </div>
+                  )}
+
+                  {!summaryLoading && summary && (
+                    <>
+                      <div
+                        className="mb-5 rounded-2xl p-5"
+                        style={{ background: "var(--ws-accent-soft)" }}
+                      >
+                        <div className="mb-3 flex items-center gap-2">
+                          <Sparkles className="size-4" style={{ color: "var(--ws-accent)" }} strokeWidth={1.75} />
+                          <h3 className="text-[12px] font-semibold uppercase tracking-[0.1em]" style={{ color: "var(--ws-accent)" }}>
+                            Clean Summary
+                          </h3>
+                        </div>
+                        <div className="text-[14.5px] leading-[1.7] text-foreground/85 whitespace-pre-wrap">
+                          {summary}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl ws-hairline p-3">
+                        <p className="text-[11.5px] text-foreground/45">
+                          Summary of <span className="font-medium">{preview.item?.cleanHost}</span> · {preview.data.wordCount.toLocaleString()} words condensed
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setView("article")}
+                          className="inline-flex items-center gap-1 text-[12px] font-medium hover:underline"
+                          style={{ color: "var(--ws-accent)" }}
+                        >
+                          <FileText className="size-3.5" strokeWidth={1.75} />
+                          Read full
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {!summaryLoading && !summary && !summaryError && (
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <div
+                        className="mb-4 flex size-12 items-center justify-center rounded-2xl"
+                        style={{ background: "var(--ws-accent-soft)" }}
+                      >
+                        <Sparkles className="size-6" style={{ color: "var(--ws-accent)" }} strokeWidth={1.5} />
+                      </div>
+                      <p className="text-[14px] font-medium">Get a clean summary</p>
+                      <p className="mt-1 max-w-[280px] text-[12.5px] text-foreground/50">
+                        WHITE&rsquo;s LLM will condense this page into 3-5 bullet points. No tracking, no storage — the summary is generated on demand.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={fetchSummary}
+                        className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-medium transition-colors"
+                        style={{ background: "var(--ws-accent)", color: "#fff" }}
+                      >
+                        <Sparkles className="size-4" strokeWidth={1.75} />
+                        Summarize
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* footer hint */}
             <footer className="ws-hairline-t px-5 py-2.5 text-center text-[11px] text-foreground/35">
-              <kbd>j</kbd> / <kbd>k</kbd> to navigate · <kbd>Esc</kbd> to close
+              <kbd>j</kbd> / <kbd>k</kbd> navigate · <kbd>s</kbd> summarize · <kbd>Esc</kbd> close
             </footer>
           </motion.aside>
         </>

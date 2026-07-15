@@ -11,6 +11,7 @@ import {
   Network,
   Keyboard,
   Sliders,
+  BarChart3,
 } from "lucide-react";
 
 export function Footer() {
@@ -20,6 +21,7 @@ export function Footer() {
   const setShowMarkov = useWhite((s) => s.setShowMarkov);
   const setShowShortcuts = useWhite((s) => s.setShowShortcuts);
   const setShowDomainRules = useWhite((s) => s.setShowDomainRules);
+  const setShowStats = useWhite((s) => s.setShowStats);
   const bookmarkCount = useWhite((s) => s.bookmarks.length);
   const domainRuleCount = useWhite((s) => s.domainRules.length);
 
@@ -39,6 +41,7 @@ export function Footer() {
           <nav className="flex flex-wrap items-center justify-center gap-0.5">
             <FooterButton onClick={() => setShowBookmarks(true)} icon={Bookmark} label="Bookmarks" badge={bookmarkCount || undefined} />
             <FooterButton onClick={() => setShowDomainRules(true)} icon={Sliders} label="Ranking" badge={domainRuleCount || undefined} />
+            <FooterButton onClick={() => setShowStats(true)} icon={BarChart3} label="Stats" />
             <FooterButton onClick={() => setShowMarkov(true)} icon={Network} label="Markov" />
             <FooterButton onClick={() => setShowSettings(true)} icon={Settings} label="Customize" />
             <FooterButton onClick={() => setShowAbout(true)} icon={Info} label="About" />

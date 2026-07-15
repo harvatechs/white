@@ -11,7 +11,8 @@ import {
 import { useWhite } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import type { MarkovInspectorData } from "@/lib/types";
-import { Network, Trash2, Search, ArrowRight, Hash, Sigma, GitBranch } from "lucide-react";
+import { Network, Trash2, Search, ArrowRight, Hash, Sigma, GitBranch, Share2 } from "lucide-react";
+import { MarkovGraph } from "./MarkovGraph";
 
 export function MarkovInspector() {
   const open = useWhite((s) => s.showMarkov);
@@ -131,6 +132,11 @@ export function MarkovInspector() {
               items={data?.topTokens?.map((t) => ({ left: t.token, right: t.frequency })) ?? []}
               rightLabel="freq"
             />
+          </Section>
+
+          {/* Visual graph */}
+          <Section title="Transition graph">
+            <MarkovGraph edges={data?.topEdges ?? []} maxNodes={10} />
           </Section>
 
           {/* Top transitions */}

@@ -185,3 +185,55 @@ Unresolved / Next-phase priorities:
 - PWA / offline shell support still pending.
 - Could add a "recently visited" view from click tracking.
 - Markov Inspector could show a visual graph of transitions.
+
+---
+Task ID: 4
+Agent: webDevReview cron (round 3)
+Task: QA the current build, fix bugs, then add AI Summarize (LLM-powered), visual Markov graph, search stats dashboard, and styling polish.
+
+Work Log:
+- Reviewed worklog.md from Tasks 1-3 — project stable with 8 features (search, Markov autocomplete, 8 themes, bookmarks, domain ranking, reading mode, keyboard shortcuts, export/import, custom accent).
+- Performed QA with agent-browser (1440x900 + 390x844 mobile):
+  - Home, search, reading mode, markov inspector, shortcuts all functional.
+  - No console errors.
+  - VLM analysis of reading pane: typography clean, suggested lighter metadata + hover states for links.
+- FOUND AND FIXED A CRITICAL BUG: j/k keyboard navigation was broken. Root cause: `setFocusedIndex` in the Zustand store expected a number, but ResultsView passed a functional updater `(prev) => ...` (React setState style). Zustand's `set()` doesn't support functional updates — it stored the function as the value, so `focusedIndex` became a function instead of a number, and `focusedIndex === i` never matched. Fixed by updating `setFocusedIndex` to accept `number | ((prev: number) => number)` and unwrap functions via `set((s) => ...)`. Verified: j now focuses result 0→1→2, k goes back 2→1.
+- Built 2 new API routes:
+  - `/api/summarize` — generates a clean, concise bullet-point summary of a web page using the LLM skill (z-ai-web-dev-sdk `chat.completions.create`). Uses page_reader to fetch content, strips HTML, sends to LLM with a system prompt enforcing ad-free, honest, under-150-word summaries. 10-min cache.
+  - `/api/stats` — aggregated search statistics: total searches, unique queries, clicks, CTR, category breakdown, 7-day activity chart (binned by day), recently visited hosts, top clicked hosts, bookmark/domain rule counts.
+- Invoked the LLM skill to understand `zai.chat.completions.create` API for the summarize feature.
+- Built 3 new UI components:
+  - `MarkovGraph.tsx` — SVG-based visual graph of Markov chain transitions. Nodes placed on concentric rings (most-connected in center), node size = frequency, edge width = transition weight, animated entry with framer-motion (scale + pathLength), arrow markers, truncation for long labels. Renders 18 nodes + 22 edges from real chain data.
+  - `StatsDialog.tsx` — full search stats dashboard: 4-stat grid (searches/unique/clicks/CTR), 7-day animated bar chart, category breakdown with progress bars, recently visited list with links, bookmark/domain rule mini-cards. Loading skeletons.
+  - Updated `ReadingPane.tsx` — added Article/Summary toggle (segmented control), Summarize button that fetches `/api/summarize`, summary card with accent-soft background, loading state with spinner, error state with retry, empty state with CTA, `s` keyboard shortcut to trigger summarize, improved line-height (1.8) for article readability, footer hint updated.
+- Updated MarkovInspector to include the MarkovGraph in a new "Transition graph" section between "Most frequent tokens" and "Strongest transitions".
+- Updated Zustand store with `showStats` state + `setShowStats` action.
+- Updated keyboard shortcuts hook: added `g then t` for stats, added `showStats` to the `anyOpen` Escape check, added to dependency array.
+- Updated ShortcutsHelp: added `g then t` (stats) and `s` (summarize in reading mode) entries.
+- Updated Footer: added Stats button (BarChart3 icon).
+- Updated page.tsx: added StatsDialog to the dialog stack.
+- Verified all features end-to-end via agent-browser:
+  - j/k navigation: j focuses 0→1→2, k goes back 2→1 (BUG FIXED).
+  - AI Summarize: opened reading mode for climate change article, clicked Summary tab → LLM generated clean 3-bullet summary in ~7s.
+  - Markov graph: SVG renders 18 nodes + 22 edges with animated entry.
+  - Stats dashboard: shows 7-day chart, category breakdown, recently visited, CTR.
+  - Escape from dialogs stays on results page (bug from round 2 still fixed).
+  - No console errors throughout.
+  - VLM evaluation: "Clean, minimalist white design with clear hierarchy, subtle focus indicators."
+- Ran `bun run lint` — clean (0 errors, 0 warnings).
+
+Stage Summary:
+- WHITE Search now has 3 major new features: AI Summarize (LLM-powered), visual Markov graph (SVG), and search stats dashboard.
+- 1 critical bug fixed (j/k navigation broken due to Zustand functional updater misuse).
+- 2 new API routes, 2 new UI components, 1 updated component.
+- Lint clean, all features browser-verified, VLM-confirmed.
+- Dev server healthy on port 3000.
+
+Unresolved / Next-phase priorities:
+- PWA / offline shell support still pending.
+- Summary could cache results to avoid re-generation.
+- Markov graph could be interactive (click node to inspect transitions).
+- Stats could show a heatmap of search activity by hour.
+- Could add a "search velocity" metric (searches per day trend).
+- Mobile: stats dialog could use a bottom sheet on small screens.
+- Reading pane could remember article/summary preference per session.

@@ -17,6 +17,7 @@ interface ShortcutHandlers {
 //   g then b     open bookmarks
 //   g then m     open markov inspector
 //   g then d     open domain ranking
+//   g then t     open search stats
 //   ?            show shortcuts help
 //   j / k        navigate results (handled in ResultsView)
 //   Enter        open reading mode for focused result
@@ -28,6 +29,7 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
   const setShowMarkov = useWhite((s) => s.setShowMarkov);
   const setShowBookmarks = useWhite((s) => s.setShowBookmarks);
   const setShowDomainRules = useWhite((s) => s.setShowDomainRules);
+  const setShowStats = useWhite((s) => s.setShowStats);
   const view = useWhite((s) => s.view);
 
   useEffect(() => {
@@ -60,6 +62,7 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
           useWhite.getState().showMarkov ||
           useWhite.getState().showBookmarks ||
           useWhite.getState().showDomainRules ||
+          useWhite.getState().showStats ||
           !!useWhite.getState().preview;
 
         if (anyOpen) return; // let the dialog/sheet/pane handle it
@@ -107,6 +110,9 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
         } else if (key === "d") {
           e.preventDefault();
           setShowDomainRules(true);
+        } else if (key === "t") {
+          e.preventDefault();
+          setShowStats(true);
         }
         resetG();
         return;
@@ -130,5 +136,5 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       window.removeEventListener("keydown", onKey);
       if (gTimer) clearTimeout(gTimer);
     };
-  }, [view, handlers, setShowSettings, setShowAbout, setShowShortcuts, setShowMarkov, setShowBookmarks, setShowDomainRules]);
+  }, [view, handlers, setShowSettings, setShowAbout, setShowShortcuts, setShowMarkov, setShowBookmarks, setShowDomainRules, setShowStats]);
 }
