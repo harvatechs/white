@@ -183,7 +183,13 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
             onKeyDown={onKey}
             onFocus={() => {
               setFocused(true);
-              if (value.trim()) setOpen(true);
+              if (value.trim()) {
+                setOpen(true);
+                // Prefetch suggestions immediately on focus if not already loaded
+                if (suggestions.length === 0 && !loading) {
+                  fetchSuggestions(value);
+                }
+              }
             }}
             autoFocus={autoFocus}
             type="text"

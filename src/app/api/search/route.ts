@@ -26,15 +26,22 @@ export async function GET(req: NextRequest) {
   if (!VALID.includes(category)) return NextResponse.json({ error: "bad category" }, { status: 400 });
 
   try {
-    await ensureSeed();
-    // Fetch more results for pagination (page * num, capped at 30)
-    const fetchNum = Math.min(page * num, 30);
+    // Fire-and-forget seed check (non-blocking)
+    ensureSeed().catch(() => {});
+
+    // For page 1, only request what we need (faster SDK call).
+    // For later pages, request page * num (capped at 30) for pagination.
+    const fetchNum = page === 1 ? num : Math.min(page * num, 30);
     const res = await runSearch(q, category, fetchNum, recencyDays && recencyDays > 0 ? recencyDays : undefined);
 
     const sessionId = await getOrCreateSessionId();
 
-    // Apply per-session domain rules: block removes, raise/lower re-sorts
-    const rules = await db.domainRule.findMany({ where: { sessionId } }).catch(() => [] as { host: string; action: string }[]);
+    // Apply per-session domain rules + learn Markov IN PARALLEL
+    const [rules] = await Promise.all([
+      db.domainRule.findMany({ where: { sessionId } }).catch(() => [] as { host: string; action: string }[]),
+      learnQuery(q).catch(() => {}),
+    ]);
+
     if (rules.length > 0) {
       const ruleMap = new Map(rules.map((r) => [r.host.replace(/^www\./, ""), r.action] as [string, string]));
       res.results = res.results.filter((r) => ruleMap.get(r.cleanHost) !== "block");
@@ -107,27 +114,25 @@ export async function GET(req: NextRequest) {
       // "relevance" = leave as-is (SDK's natural ranking)
     }
 
-    // learn from this query (Markov) + persist to history (dedupe consecutive identical)
-    // Only learn on page 1 to avoid duplicate history entries
-    if (page === 1) {
-      await learnQuery(q).catch(() => {});
-      const last = await db.searchHistory.findFirst({
-        orderBy: { createdAt: "desc" },
-        select: { query: true, category: true },
-      });
-      const isDupe = last?.query === q && last?.category === category;
-      if (!isDupe) {
-        await db.searchHistory
-          .create({ data: { query: q, category, resultsCount: res.total } })
-          .catch(() => {});
-      }
-    }
-
     // Slice results for the requested page
     const startIdx = (page - 1) * num;
     const pageResults = res.results.slice(startIdx, startIdx + num);
 
-    return NextResponse.json({
+    // Persist to history (fire-and-forget, non-blocking)
+    if (page === 1) {
+      db.searchHistory.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { query: true, category: true },
+      }).then((last) => {
+        const isDupe = last?.query === q && last?.category === category;
+        if (!isDupe) {
+          return db.searchHistory.create({ data: { query: q, category, resultsCount: res.total } });
+        }
+        return null;
+      }).catch(() => {});
+    }
+
+    const response = NextResponse.json({
       ...res,
       results: pageResults,
       total: res.total,
@@ -135,6 +140,15 @@ export async function GET(req: NextRequest) {
       pageSize: num,
       hasMore: startIdx + num < res.results.length,
     });
+
+    // Add cache headers for CDN/browser caching (short for fresh, longer for cached)
+    if (res.cached) {
+      response.headers.set("Cache-Control", "public, max-age=300, s-maxage=600");
+    } else {
+      response.headers.set("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
+    }
+
+    return response;
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "search failed";
     console.error("[/api/search] error", e);

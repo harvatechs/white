@@ -25,29 +25,30 @@ export async function GET(req: NextRequest) {
     const seen = new Set<string>();
     seen.add(q.toLowerCase());
 
-    // 1) Markov: find queries in history that share tokens with this query
+    // 1) Markov + History in parallel (fast SQLite queries)
     const tokens = q.toLowerCase().replace(/[^\w\s]/g, " ").split(/\s+/).filter(Boolean);
-    for (const token of tokens.slice(0, 3)) {
-      const edges = await db.markovEdge.findMany({
-        where: { fromToken: token },
+    const [markovEdges, history] = await Promise.all([
+      // Get edges for all tokens at once
+      db.markovEdge.findMany({
+        where: { fromToken: { in: tokens.slice(0, 3) } },
         orderBy: { weight: "desc" },
-        take: 5,
-      }).catch(() => []);
-      for (const e of edges) {
-        const candidate = `${q} ${e.toToken}`.toLowerCase();
-        if (!seen.has(candidate) && candidate !== q.toLowerCase()) {
-          seen.add(candidate);
-          related.push({ text: candidate, source: "markov" });
-        }
+        take: 15,
+      }).catch(() => []),
+      db.searchHistory.findMany({
+        where: { query: { contains: tokens[0] ?? q } },
+        take: 10,
+        select: { query: true },
+      }).catch(() => []),
+    ]);
+
+    for (const e of markovEdges) {
+      const candidate = `${q} ${e.toToken}`.toLowerCase();
+      if (!seen.has(candidate) && candidate !== q.toLowerCase()) {
+        seen.add(candidate);
+        related.push({ text: candidate, source: "markov" });
       }
     }
 
-    // 2) History: find other queries the user searched that share a token
-    const history = await db.searchHistory.findMany({
-      where: { query: { contains: tokens[0] ?? q } },
-      take: 10,
-      select: { query: true },
-    }).catch(() => []);
     for (const h of history) {
       const lower = h.query.toLowerCase();
       if (!seen.has(lower) && lower !== q.toLowerCase()) {
@@ -56,32 +57,34 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 3) Web search suggestions (append "vs", "how", "what", "best" patterns)
-    // Best-effort — skip if rate-limited
-    try {
-      const zai = await getZai();
-      const searchResults = (await zai.functions.invoke("web_search", {
-        query: q,
-        num: 5,
-      })) as { name?: string; snippet?: string }[];
-      // extract phrases from result titles
-      for (const r of searchResults.slice(0, 3)) {
-        const title = r.name ?? "";
-        // look for "X vs Y" patterns
-        const vsMatch = title.match(/vs\.?\s+([A-Za-z0-9\s]+)/i);
-        if (vsMatch) {
-          const candidate = `${q} vs ${vsMatch[1].trim().split(/\s+/).slice(0, 3).join(" ")}`.toLowerCase();
-          if (!seen.has(candidate)) {
-            seen.add(candidate);
-            related.push({ text: candidate, source: "web" });
+    // 2) Only do web search if we don't have enough from Markov/history
+    // This avoids the slow 2-3s web search call when we already have good data
+    if (related.length < 4) {
+      try {
+        const zai = await getZai();
+        const searchResults = (await zai.functions.invoke("web_search", {
+          query: q,
+          num: 5,
+        })) as { name?: string; snippet?: string }[];
+        for (const r of searchResults.slice(0, 3)) {
+          const title = r.name ?? "";
+          const vsMatch = title.match(/vs\.?\s+([A-Za-z0-9\s]+)/i);
+          if (vsMatch) {
+            const candidate = `${q} vs ${vsMatch[1].trim().split(/\s+/).slice(0, 3).join(" ")}`.toLowerCase();
+            if (!seen.has(candidate)) {
+              seen.add(candidate);
+              related.push({ text: candidate, source: "web" });
+            }
           }
         }
+      } catch {
+        // web search is best-effort — rate limits are expected
       }
-    } catch {
-      // web search is best-effort — rate limits are expected
     }
 
-    return NextResponse.json({ related: related.slice(0, 8) });
+    const response = NextResponse.json({ related: related.slice(0, 8) });
+    response.headers.set("Cache-Control", "public, max-age=120, s-maxage=300");
+    return response;
   } catch (e) {
     console.error("[/api/related] error", e);
     return NextResponse.json({ related: [] });

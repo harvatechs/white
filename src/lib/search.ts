@@ -63,6 +63,7 @@ export async function runSearch(
   const started = Date.now();
   const key = `${category}:${query.toLowerCase().trim()}:${recencyDays ?? "all"}`;
 
+  // Check cache first — return immediately if fresh
   const cached = cache.get(key);
   if (cached && Date.now() - cached.at < CACHE_TTL) {
     return {
@@ -74,6 +75,9 @@ export async function runSearch(
       results: cached.results,
     };
   }
+
+  // If stale cache exists (within 1 hour), return it as fallback while we try to refresh
+  const stale = cached && Date.now() - cached.at < CACHE_TTL * 6;
 
   const zai = await getZai();
 
@@ -91,7 +95,38 @@ export async function runSearch(
     args.query = `${query} images`;
   }
 
-  const raw = (await zai.functions.invoke("web_search", args)) as SearchSource[];
+  // SDK call with retry on 429 + stale cache fallback
+  let raw: SearchSource[] | null = null;
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      raw = (await zai.functions.invoke("web_search", args)) as SearchSource[];
+      break;
+    } catch (e) {
+      lastError = e;
+      // On 429 (rate limit), return stale cache if available instead of retrying
+      if (e instanceof Error && e.message.includes("429")) {
+        if (stale) {
+          return {
+            query,
+            category,
+            total: cached!.results.length,
+            tookMs: Date.now() - started,
+            cached: true,
+            results: cached!.results,
+          };
+        }
+        throw e; // no stale cache — rethrow
+      }
+      // On other errors, retry once
+      if (attempt === 0) {
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+      throw e;
+    }
+  }
+  if (!raw) throw lastError ?? new Error("search failed");
 
   let results = transform(raw ?? [], category);
 

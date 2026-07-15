@@ -103,20 +103,35 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
 
     const prefs = useWhite((s) => s.prefs);
 
+    // Client-side result cache for instant back/forward navigation
+    const cacheRef = useRef<Map<string, { results: SearchResultItem[]; meta: { tookMs: number; total: number; cached: boolean; hasMore?: boolean } | null }>>(new Map());
+
     const runSearch = useCallback(async (q: string, c: SearchCategory, r?: TimeRange, p?: number) => {
       if (!q.trim()) return;
       const pageNum = p ?? 1;
+      const range = r ?? timeRange;
+      const algo = prefs.searchAlgorithm;
+      // Check client cache first
+      const cacheKey = `${q}|${c}|${range}|${algo}|${pageNum}`;
+      const cached = cacheRef.current.get(cacheKey);
+      if (cached) {
+        setResults(cached.results);
+        setMeta(cached.meta);
+        setLoading(false);
+        setError(null);
+        setFocusedIndex(-1);
+        return;
+      }
       setLoading(true);
       setError(null);
       setFocusedIndex(-1);
       const myReq = ++reqIdRef.current;
-      const range = r ?? timeRange;
       const days = range === "all" ? "" : `&r=${TIME_RANGE_DAYS[range]}`;
-      const algo = `&a=${prefs.searchAlgorithm}`;
+      const algoParam = `&a=${algo}`;
       const pageParam = `&p=${pageNum}&num=${pageSize}`;
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&c=${c}${pageParam}${days}${algo}`);
-        const data = (await res.json()) as SearchResponse & { error?: string };
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&c=${c}${pageParam}${days}${algoParam}`);
+        const data = (await res.json()) as SearchResponse & { error?: string; hasMore?: boolean };
         if (myReq === reqIdRef.current) {
           if (!res.ok && data.error) {
             setError(
@@ -127,8 +142,16 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
             setResults([]);
             setMeta(null);
           } else {
-            setResults(data.results ?? []);
-            setMeta({ tookMs: data.tookMs, total: data.total, cached: data.cached, hasMore: (data as { hasMore?: boolean }).hasMore });
+            const newResults = data.results ?? [];
+            const newMeta = { tookMs: data.tookMs, total: data.total, cached: data.cached, hasMore: data.hasMore };
+            setResults(newResults);
+            setMeta(newMeta);
+            // Store in client cache (limit to 20 entries)
+            cacheRef.current.set(cacheKey, { results: newResults, meta: newMeta });
+            if (cacheRef.current.size > 20) {
+              const firstKey = cacheRef.current.keys().next().value;
+              if (firstKey) cacheRef.current.delete(firstKey);
+            }
           }
         }
       } catch {
