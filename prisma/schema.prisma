@@ -74,6 +74,7 @@ model Preferences {
   markovEnabled Boolean  @default(true)
   suggestionCount Int    @default(8)
   accent        String   @default("graphite") // graphite | sage | rose | amber | slate
+  customAccent  String?  // hex color override, null = use preset
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -93,4 +94,18 @@ model Bookmark {
   @@unique([sessionId, url])
   @@index([sessionId])
   @@index([query])
+}
+
+// DomainRule — per-session domain ranking: raise (boost), lower (demote), block (hide)
+// Kagi-inspired. Of the people: you shape your own results.
+model DomainRule {
+  id        String   @id @default(cuid())
+  sessionId String
+  host      String
+  action    String   // raise | lower | block
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sessionId, host])
+  @@index([sessionId])
 }

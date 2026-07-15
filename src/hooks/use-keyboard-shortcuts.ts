@@ -16,14 +16,18 @@ interface ShortcutHandlers {
 //   g then a     open about
 //   g then b     open bookmarks
 //   g then m     open markov inspector
+//   g then d     open domain ranking
 //   ?            show shortcuts help
-//   j / k        (reserved — handled in results list)
+//   j / k        navigate results (handled in ResultsView)
+//   Enter        open reading mode for focused result
+//   o            open focused result's original page
 export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
   const setShowSettings = useWhite((s) => s.setShowSettings);
   const setShowAbout = useWhite((s) => s.setShowAbout);
   const setShowShortcuts = useWhite((s) => s.setShowShortcuts);
   const setShowMarkov = useWhite((s) => s.setShowMarkov);
   const setShowBookmarks = useWhite((s) => s.setShowBookmarks);
+  const setShowDomainRules = useWhite((s) => s.setShowDomainRules);
   const view = useWhite((s) => s.view);
 
   useEffect(() => {
@@ -36,6 +40,9 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
     };
 
     const onKey = (e: KeyboardEvent) => {
+      // If Radix already handled Escape (closing a dialog), don't also go home
+      if (e.defaultPrevented) return;
+
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
       const isTyping =
@@ -51,9 +58,11 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
           useWhite.getState().showAbout ||
           useWhite.getState().showShortcuts ||
           useWhite.getState().showMarkov ||
-          useWhite.getState().showBookmarks;
+          useWhite.getState().showBookmarks ||
+          useWhite.getState().showDomainRules ||
+          !!useWhite.getState().preview;
 
-        if (anyOpen) return; // let the dialog/sheet handle it
+        if (anyOpen) return; // let the dialog/sheet/pane handle it
         if (view === "results") {
           e.preventDefault();
           handlers.onHome();
@@ -95,6 +104,9 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
         } else if (key === "m") {
           e.preventDefault();
           setShowMarkov(true);
+        } else if (key === "d") {
+          e.preventDefault();
+          setShowDomainRules(true);
         }
         resetG();
         return;
@@ -118,5 +130,5 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       window.removeEventListener("keydown", onKey);
       if (gTimer) clearTimeout(gTimer);
     };
-  }, [view, handlers, setShowSettings, setShowAbout, setShowShortcuts, setShowMarkov, setShowBookmarks]);
+  }, [view, handlers, setShowSettings, setShowAbout, setShowShortcuts, setShowMarkov, setShowBookmarks, setShowDomainRules]);
 }

@@ -2,13 +2,14 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Bookmark, Info, Keyboard } from "lucide-react";
+import { ArrowLeft, Bookmark, Info, Keyboard, Sliders } from "lucide-react";
 import { SearchBox, type SearchBoxHandle } from "./SearchBox";
 import { WhiteLogo } from "./WhiteLogo";
 import { SearchTabs } from "./SearchTabs";
 import { ResultList } from "./ResultCard";
 import { Footer } from "./Footer";
 import { HistoryPanel } from "./HistoryPanel";
+import { ReadingPane } from "./ReadingPane";
 import { useWhite } from "@/lib/store";
 import type { SearchCategory, SearchResponse, SearchResultItem } from "@/lib/types";
 
@@ -30,7 +31,13 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
     const setShowAbout = useWhite((s) => s.setShowAbout);
     const setShowBookmarks = useWhite((s) => s.setShowBookmarks);
     const setShowShortcuts = useWhite((s) => s.setShowShortcuts);
+    const setShowDomainRules = useWhite((s) => s.setShowDomainRules);
     const bookmarkCount = useWhite((s) => s.bookmarks.length);
+    const domainRuleCount = useWhite((s) => s.domainRules.length);
+    const focusedIndex = useWhite((s) => s.focusedIndex);
+    const setFocusedIndex = useWhite((s) => s.setFocusedIndex);
+    const preview = useWhite((s) => s.preview);
+    const setPreview = useWhite((s) => s.setPreview);
 
     const [results, setResults] = useState<SearchResultItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -47,6 +54,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       if (!q.trim()) return;
       setLoading(true);
       setError(null);
+      setFocusedIndex(-1);
       const myReq = ++reqIdRef.current;
       try {
         const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&c=${c}&num=15`);
@@ -63,7 +71,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       } finally {
         if (myReq === reqIdRef.current) setLoading(false);
       }
-    }, []);
+    }, [setFocusedIndex]);
 
     useEffect(() => {
       runSearch(query, category);
@@ -96,6 +104,34 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       };
     }, [loading]);
 
+    // j/k navigation through results (only when reading pane is closed)
+    useEffect(() => {
+      const onKey = (e: KeyboardEvent) => {
+        if (preview) return; // reading pane handles its own nav
+        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable) return;
+        if (loading || results.length === 0) return;
+
+        if (e.key === "j" || (e.key === "ArrowDown" && !e.target)) {
+          e.preventDefault();
+          setFocusedIndex((prev) => Math.min(prev + 1, results.length - 1));
+        } else if (e.key === "k" || (e.key === "ArrowUp" && !e.target)) {
+          e.preventDefault();
+          setFocusedIndex((prev) => Math.max(prev - 1, 0));
+        } else if (e.key === "Enter" && focusedIndex >= 0 && results[focusedIndex]) {
+          // Enter on focused result opens reading mode
+          e.preventDefault();
+          setPreview({ item: results[focusedIndex], data: null, loading: true, error: null });
+        } else if (e.key === "o" && focusedIndex >= 0 && results[focusedIndex]) {
+          // 'o' opens the original page
+          e.preventDefault();
+          window.open(results[focusedIndex].url, "_blank", "noopener");
+        }
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, [preview, loading, results, focusedIndex, setFocusedIndex, setPreview]);
+
     const handleSubmit = (q: string) => onNewQuery(q);
     const handleTabChange = (c: SearchCategory) => onCategoryChange(c);
 
@@ -106,8 +142,8 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
           className="sticky top-0 z-40 ws-hairline-b backdrop-blur-xl"
           style={{ background: "color-mix(in srgb, var(--ws-bg) 85%, transparent)" }}
         >
-          <div className="mx-auto max-w-3xl px-4 pt-3 pb-0 md:px-6">
-            <div className="flex items-center gap-2 md:gap-3">
+          <div className="mx-auto max-w-3xl px-3 pt-3 pb-0 md:px-6">
+            <div className="flex items-center gap-1.5 md:gap-3">
               <button
                 type="button"
                 onClick={onBack}
@@ -118,6 +154,25 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
               </button>
               <WhiteLogo size="sm" showDot={false} onClick={onBack} className="hidden md:inline-flex" />
               <SearchBox ref={searchRef} size="md" onSubmit={handleSubmit} className="flex-1" />
+
+              {/* domain rules */}
+              <button
+                type="button"
+                onClick={() => setShowDomainRules(true)}
+                className="relative hidden size-9 shrink-0 items-center justify-center rounded-full hover:ws-whisper transition-colors sm:flex"
+                aria-label="Domain ranking rules"
+                title="Domain ranking"
+              >
+                <Sliders className="size-4" strokeWidth={1.75} />
+                {domainRuleCount > 0 && (
+                  <span
+                    className="absolute -right-0.5 -top-0.5 inline-flex min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-semibold tabular-nums"
+                    style={{ background: "var(--ws-accent)", color: "#fff" }}
+                  >
+                    {domainRuleCount > 99 ? "99+" : domainRuleCount}
+                  </span>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={() => setShowBookmarks(true)}
@@ -152,7 +207,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
               </button>
             </div>
 
-            <div className="mt-2 ws-hairline-b -mx-4 md:-mx-6 px-4 md:px-6">
+            <div className="mt-2 ws-hairline-b -mx-3 md:-mx-6 px-3 md:px-6">
               <SearchTabs onChange={handleTabChange} />
             </div>
           </div>
@@ -173,6 +228,11 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
                   cached
                 </span>
               )}
+              {focusedIndex >= 0 && (
+                <span className="ml-3 text-foreground/35">
+                  <kbd className="mr-1">{focusedIndex + 1}</kbd>· <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>Enter</kbd> read · <kbd>o</kbd> open
+                </span>
+              )}
             </motion.p>
           )}
           {error && (
@@ -185,7 +245,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
         {/* Results */}
         <main className="mx-auto w-full max-w-3xl flex-1 px-2 pb-10 md:px-6">
           <div className="mt-3 ws-hairline overflow-hidden rounded-2xl ws-surface">
-            <ResultList items={results} loading={loading} query={query} />
+            <ResultList items={results} loading={loading} query={query} focusedIndex={focusedIndex} />
           </div>
 
           {!loading && history.length > 0 && (
@@ -196,6 +256,12 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
         </main>
 
         <Footer />
+
+        {/* Reading pane (slide-in) */}
+        <ReadingPane
+          items={results}
+          onNavigate={(item) => setPreview({ item, data: null, loading: true, error: null })}
+        />
       </div>
     );
   }

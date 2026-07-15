@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runSearch } from "@/lib/search";
 import { learnQuery, ensureSeed } from "@/lib/markov";
 import { db } from "@/lib/db";
+import { getOrCreateSessionId } from "@/lib/session";
 import type { SearchCategory } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -22,6 +23,27 @@ export async function GET(req: NextRequest) {
   try {
     await ensureSeed();
     const res = await runSearch(q, category, num);
+
+    // Apply per-session domain rules: block removes, raise/lower re-sorts
+    const sessionId = await getOrCreateSessionId();
+    const rules = await db.domainRule.findMany({ where: { sessionId } }).catch(() => []);
+    if (rules.length > 0) {
+      const ruleMap = new Map(rules.map((r) => [r.host.replace(/^www\./, ""), r.action]));
+      let filtered = res.results.filter((r) => {
+        const action = ruleMap.get(r.cleanHost);
+        return action !== "block";
+      });
+      // stable sort: raised first, lowered last
+      const score = (host: string) => {
+        const a = ruleMap.get(host);
+        if (a === "raise") return -1;
+        if (a === "lower") return 1;
+        return 0;
+      };
+      filtered = [...filtered].sort((a, b) => score(a.cleanHost) - score(b.cleanHost));
+      res.results = filtered;
+      res.total = filtered.length;
+    }
 
     // learn from this query (Markov) + persist to history (dedupe consecutive identical)
     await learnQuery(q).catch(() => {});

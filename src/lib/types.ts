@@ -60,6 +60,7 @@ export interface UserPreferences {
   markovEnabled: boolean;
   suggestionCount: number;
   accent: AccentName;
+  customAccent: string | null; // hex color, overrides accent when set
 }
 
 export interface HistoryItem {
@@ -90,6 +91,26 @@ export interface PopularQuery {
 export interface PopularHost {
   host: string;
   count: number;
+}
+
+export type DomainAction = "raise" | "lower" | "block";
+
+export interface DomainRule {
+  id: string;
+  host: string;
+  action: DomainAction;
+  updatedAt: string;
+}
+
+export interface PreviewData {
+  url: string;
+  title: string;
+  publishedTime: string;
+  text: string;
+  wordCount: number;
+  truncated: boolean;
+  cached?: boolean;
+  error?: string;
 }
 
 export interface MarkovStats {

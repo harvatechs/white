@@ -117,11 +117,13 @@ export const FONT_SCALE_CLASS: Record<FontScale, string> = {
 };
 
 // Apply a theme + accent + density to :root as CSS custom properties + data attrs.
+// If customAccentHex is provided, it overrides the preset accent color.
 export function applyTheme(
   theme: WhiteTheme,
   accent: AccentName,
   density?: Density,
-  fontScale?: FontScale
+  fontScale?: FontScale,
+  customAccentHex?: string | null
 ) {
   if (typeof document === "undefined") return;
   const t = THEME_MAP[theme];
@@ -130,13 +132,20 @@ export function applyTheme(
   root.style.setProperty("--ws-bg", t.swatch);
   root.style.setProperty("--ws-surface", t.surface);
   root.style.setProperty("--ws-whisper", t.whisper);
-  root.style.setProperty("--ws-accent", a.color);
-  root.style.setProperty("--ws-accent-soft", a.soft);
-  root.style.setProperty("--ws-accent-rgb", hexToRgb(a.color));
+  const accentColor = customAccentHex || a.color;
+  const soft = customAccentHex ? hexToSoft(customAccentHex) : a.soft;
+  root.style.setProperty("--ws-accent", accentColor);
+  root.style.setProperty("--ws-accent-soft", soft);
+  root.style.setProperty("--ws-accent-rgb", hexToRgb(accentColor));
   root.dataset.wsTheme = theme;
-  root.dataset.wsAccent = accent;
+  root.dataset.wsAccent = customAccentHex ? "custom" : accent;
   if (density) root.dataset.density = density;
   if (fontScale) root.dataset.fontScale = fontScale;
+}
+
+function hexToSoft(hex: string): string {
+  const rgb = hexToRgb(hex);
+  return `rgba(${rgb}, 0.08)`;
 }
 
 function hexToRgb(hex: string): string {

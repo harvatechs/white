@@ -29,6 +29,7 @@ export async function GET() {
           markovEnabled: row.markovEnabled,
           suggestionCount: row.suggestionCount,
           accent: (row.accent as AccentName) || DEFAULT_PREFS.accent,
+          customAccent: row.customAccent ?? null,
         }
       : { ...DEFAULT_PREFS, sessionId };
 
@@ -56,6 +57,7 @@ export async function PUT(req: NextRequest) {
       markovEnabled: typeof body.markovEnabled === "boolean" ? body.markovEnabled : DEFAULT_PREFS.markovEnabled,
       suggestionCount: Math.min(Math.max(parseInt(body.suggestionCount, 10) || DEFAULT_PREFS.suggestionCount, 3), 15),
       accent: VALID_ACCENT.includes(body.accent) ? body.accent : DEFAULT_PREFS.accent,
+      customAccent: typeof body.customAccent === "string" && /^#[0-9a-f]{6}$/i.test(body.customAccent) ? body.customAccent : null,
     };
 
     const row = await db.preferences.upsert({

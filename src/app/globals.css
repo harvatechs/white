@@ -388,6 +388,14 @@ input:focus-visible {
   padding-bottom: 22px;
 }
 
+/* Focused result (j/k navigation) */
+.ws-result.ws-focused {
+  background: color-mix(in srgb, var(--ws-accent) 4%, transparent);
+}
+.ws-result.ws-focused:hover {
+  background: color-mix(in srgb, var(--ws-accent) 7%, transparent);
+}
+
 /* Subtle gradient accent on home hero */
 .ws-hero-glow {
   position: absolute;

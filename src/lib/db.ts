@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 // Cache-bust key: bump this when the Prisma schema changes to force a fresh
 // client instance in dev mode (otherwise the global singleton keeps the old
 // generated client that may not know about new models).
-const SCHEMA_VERSION = 'v2-bookmarks'
+const SCHEMA_VERSION = 'v4-customaccent'
 
 const globalForPrisma = globalThis as unknown as {
   __wsPrisma?: { version: string; client: PrismaClient }

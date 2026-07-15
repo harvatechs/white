@@ -7,11 +7,15 @@ import type {
   AccentName,
   BookmarkItem,
   Density,
+  DomainAction,
+  DomainRule,
   FontScale,
   HistoryItem,
   PopularHost,
   PopularQuery,
+  PreviewData,
   SearchCategory,
+  SearchResultItem,
   SuggestionItem,
   UserPreferences,
   ViewState,
@@ -29,6 +33,7 @@ export const DEFAULT_PREFS: UserPreferences = {
   markovEnabled: true,
   suggestionCount: 8,
   accent: "graphite",
+  customAccent: null,
 };
 
 interface WhiteStore {
@@ -42,6 +47,8 @@ interface WhiteStore {
   popularQueries: PopularQuery[];
   popularHosts: PopularHost[];
   bookmarkUrls: Set<string>;
+  domainRules: DomainRule[];
+  domainRuleMap: Map<string, DomainAction>;
   suggestions: SuggestionItem[];
   suggestionsLoading: boolean;
   showAbout: boolean;
@@ -49,6 +56,11 @@ interface WhiteStore {
   showShortcuts: boolean;
   showMarkov: boolean;
   showBookmarks: boolean;
+  showDomainRules: boolean;
+  // Reading Mode
+  preview: { item: SearchResultItem; data: PreviewData | null; loading: boolean; error: string | null } | null;
+  // j/k navigation
+  focusedIndex: number;
 
   setView: (v: ViewState) => void;
   setQuery: (q: string) => void;
@@ -68,6 +80,12 @@ interface WhiteStore {
   setShowShortcuts: (b: boolean) => void;
   setShowMarkov: (b: boolean) => void;
   setShowBookmarks: (b: boolean) => void;
+  setShowDomainRules: (b: boolean) => void;
+  setDomainRules: (r: DomainRule[]) => void;
+  setDomainRule: (host: string, action: DomainAction) => void;
+  removeDomainRule: (host: string) => void;
+  setPreview: (p: WhiteStore["preview"]) => void;
+  setFocusedIndex: (i: number) => void;
 
   resetToHome: () => void;
 }
@@ -83,6 +101,8 @@ export const useWhite = create<WhiteStore>((set, get) => ({
   popularQueries: [],
   popularHosts: [],
   bookmarkUrls: new Set<string>(),
+  domainRules: [],
+  domainRuleMap: new Map(),
   suggestions: [],
   suggestionsLoading: false,
   showAbout: false,
@@ -90,6 +110,9 @@ export const useWhite = create<WhiteStore>((set, get) => ({
   showShortcuts: false,
   showMarkov: false,
   showBookmarks: false,
+  showDomainRules: false,
+  preview: null,
+  focusedIndex: -1,
 
   setView: (v) => set({ view: v }),
   setQuery: (q) => set({ query: q }),
@@ -122,8 +145,35 @@ export const useWhite = create<WhiteStore>((set, get) => ({
   setShowShortcuts: (b) => set({ showShortcuts: b }),
   setShowMarkov: (b) => set({ showMarkov: b }),
   setShowBookmarks: (b) => set({ showBookmarks: b }),
+  setShowDomainRules: (b) => set({ showDomainRules: b }),
+  setDomainRules: (r) =>
+    set({
+      domainRules: r,
+      domainRuleMap: new Map(r.map((x) => [x.host, x.action])),
+    }),
+  setDomainRule: (host, action) =>
+    set((s) => {
+      const existing = s.domainRules.find((x) => x.host === host);
+      const nextRules = existing
+        ? s.domainRules.map((x) => (x.host === host ? { ...x, action, updatedAt: new Date().toISOString() } : x))
+        : [{ id: `tmp_${Date.now()}`, host, action, updatedAt: new Date().toISOString() }, ...s.domainRules];
+      return {
+        domainRules: nextRules,
+        domainRuleMap: new Map(nextRules.map((x) => [x.host, x.action])),
+      };
+    }),
+  removeDomainRule: (host) =>
+    set((s) => {
+      const nextRules = s.domainRules.filter((x) => x.host !== host);
+      return {
+        domainRules: nextRules,
+        domainRuleMap: new Map(nextRules.map((x) => [x.host, x.action])),
+      };
+    }),
+  setPreview: (p) => set({ preview: p }),
+  setFocusedIndex: (i) => set({ focusedIndex: i }),
 
-  resetToHome: () => set({ view: "home", query: "", suggestions: [] }),
+  resetToHome: () => set({ view: "home", query: "", suggestions: [], preview: null, focusedIndex: -1 }),
 }));
 
 // Convenience selectors

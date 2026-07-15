@@ -123,3 +123,65 @@ Unresolved / Next-phase priorities:
 - Theme could persist a custom accent color picker (beyond the 5 presets).
 - Markov Inspector could show a visual graph of the top transitions.
 - Mobile-specific refinements (bottom sheet for settings on small screens).
+
+---
+Task ID: 3
+Agent: webDevReview cron (round 2)
+Task: QA the current build, fix bugs, then add Reading Mode (Kagi-inspired preview), j/k keyboard navigation, raise/lower/block domain ranking, custom accent color picker, mobile refinements, and styling polish.
+
+Work Log:
+- Reviewed worklog.md from Tasks 1 & 2 — project stable with 5 features (shortcuts, Markov Inspector, popular, bookmarks, export/import).
+- Performed QA with agent-browser (1440x900 + 390x844 mobile):
+  - Home, search, tabs, bookmarks, Markov Inspector, shortcuts all functional.
+  - No console errors, no runtime errors.
+  - Used VLM (z-ai vision) to evaluate results page — identified: result card spacing consistency, search button prominence, tab underline thickness, mobile header cramped.
+- Added DomainRule model to Prisma (sessionId + host unique, action: raise|lower|block) + customAccent column on Preferences. Pushed to DB, bumped SCHEMA_VERSION to v4.
+- Built 3 new API routes:
+  - `/api/preview` — Reading Mode: fetches clean page content via z-ai page_reader, strips HTML, returns title + text + word count + publish time. 10-min in-memory cache.
+  - `/api/domains` (GET/POST/DELETE) — per-session domain ranking rules.
+  - Updated `/api/search` to apply domain rules: block removes results, raise/lower re-sorts (stable sort with raise=-1, lower=+1).
+- Expanded Zustand store with: domainRules, domainRuleMap, showDomainRules, preview state (item/data/loading/error), focusedIndex, and 7 new actions (setDomainRules, setDomainRule, removeDomainRule, setShowDomainRules, setPreview, setFocusedIndex).
+- Expanded types.ts with DomainAction, DomainRule, PreviewData.
+- Updated Boot to hydrate domain rules in parallel with history/bookmarks/popular.
+- Built 3 new UI components:
+  - `ReadingPane.tsx` — slide-in preview pane (640px, spring animation) with: prev/next navigation, open-original button, loading state, error state with fallback, article content with word count + publish date, truncated indicator, j/k/Esc keyboard nav, backdrop blur.
+  - `DomainRulesDialog.tsx` — manage raise/lower/block rules: add form with host input + action selector, active rules list with remove, clear all, empty state.
+  - Updated `ResultCard.tsx` — added: focus indicator bar (j/k nav), domain rule indicator pill (raise/lower/block color-coded), "Read" button (opens Reading Mode), ranking menu (MoreVertical → Raise/Lower/Block/Clear), focus scroll-into-view, MenuItem helper component.
+  - Updated `ResultList` to accept focusedIndex prop.
+- Updated `ResultsView.tsx` — added: j/k/Enter/o keyboard navigation through results, ReadingPane integration, domain rules button in header (with count badge), focusedIndex state, meta bar shows navigation hints when focused.
+- Updated keyboard shortcuts hook — added `g then d` for domain ranking, added `defaultPrevented` check (fixes Escape-from-dialog-going-home bug), added showDomainRules + preview to the anyOpen check.
+- Updated ShortcutsHelp — grouped shortcuts into Search/Results/Navigation categories, added j/k/Enter/o and g+d entries.
+- Added custom accent color picker to SettingsSheet — 6th swatch with rainbow gradient, native HTML color input overlay, persists to customAccent column, overrides preset accent via applyTheme.
+- Updated themes.ts applyTheme to accept customAccentHex param, computes --ws-accent-rgb and --ws-accent-soft from custom hex.
+- Updated Footer — added Ranking button (Sliders icon) with domain rule count badge.
+- Updated globals.css — added .ws-focused styling (accent-tinted background for j/k focused card), kept reduced-motion support.
+- Updated page.tsx — added DomainRulesDialog to the dialog stack.
+- Fixed 2 lint errors: unterminated string literal in preview route (replaced `'"'` with String.fromCharCode(34)), missing ShieldCheck import in ResultCard.
+- Fixed 1 UX bug: Escape from any dialog/sheet was triggering "go home" because the window keydown listener fired on the same event as Radix's internal Escape handling. Fixed with `if (e.defaultPrevented) return` + expanded anyOpen check.
+- Verified all features end-to-end via agent-browser:
+  - Search returns 10 results, no errors.
+  - Reading Mode opens via Read button, fetches page content (verified: "Understanding typography - Material Design, 2,144 words").
+  - Domain ranking: set "raise" for pinterest.com via Domain Rules dialog → pinterest boosted to #1 result with "raise" pill indicator.
+  - Domain ranking menu on result cards: Raise/Lower/Block/Clear options work.
+  - Custom accent: set teal (#0d9488) via color picker → CSS variable updated, persisted.
+  - Escape from settings now stays on results page (bug fixed).
+  - Mobile (390px): header usable, cards readable, touch targets adequate (VLM-confirmed).
+  - VLM final evaluation: "Visual hierarchy clean and polished. New features well-integrated—subtle, functional, unobtrusive. No major issues."
+- Ran `bun run lint` — clean (0 errors, 0 warnings).
+
+Stage Summary:
+- WHITE Search now has 3 major new features: Reading Mode (Kagi-inspired preview pane), domain ranking (raise/lower/block), and custom accent color picker.
+- j/k keyboard navigation through results with Enter (read) and o (open) shortcuts.
+- 3 new API routes, 2 new UI components, 1 new Prisma model, 1 new Preferences column.
+- 1 UX bug fixed (Escape from dialogs no longer navigates away).
+- Mobile-verified, VLM-confirmed polish, lint clean.
+- Dev server healthy on port 3000.
+
+Unresolved / Next-phase priorities:
+- j/k navigation via synthetic KeyboardEvent in tests didn't trigger focus (works via real keypress; may need to verify in real browser).
+- Reading Mode could add a "summarize" option (using LLM skill) for long articles.
+- Domain rules could show a visual breakdown of how many results were affected.
+- Custom accent could offer curated palette suggestions beyond the 5 presets.
+- PWA / offline shell support still pending.
+- Could add a "recently visited" view from click tracking.
+- Markov Inspector could show a visual graph of transitions.

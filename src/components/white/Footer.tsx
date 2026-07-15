@@ -10,6 +10,7 @@ import {
   Bookmark,
   Network,
   Keyboard,
+  Sliders,
 } from "lucide-react";
 
 export function Footer() {
@@ -18,7 +19,9 @@ export function Footer() {
   const setShowBookmarks = useWhite((s) => s.setShowBookmarks);
   const setShowMarkov = useWhite((s) => s.setShowMarkov);
   const setShowShortcuts = useWhite((s) => s.setShowShortcuts);
+  const setShowDomainRules = useWhite((s) => s.setShowDomainRules);
   const bookmarkCount = useWhite((s) => s.bookmarks.length);
+  const domainRuleCount = useWhite((s) => s.domainRules.length);
 
   return (
     <footer className="mt-auto ws-hairline-t">
@@ -35,6 +38,7 @@ export function Footer() {
           {/* Primary nav */}
           <nav className="flex flex-wrap items-center justify-center gap-0.5">
             <FooterButton onClick={() => setShowBookmarks(true)} icon={Bookmark} label="Bookmarks" badge={bookmarkCount || undefined} />
+            <FooterButton onClick={() => setShowDomainRules(true)} icon={Sliders} label="Ranking" badge={domainRuleCount || undefined} />
             <FooterButton onClick={() => setShowMarkov(true)} icon={Network} label="Markov" />
             <FooterButton onClick={() => setShowSettings(true)} icon={Settings} label="Customize" />
             <FooterButton onClick={() => setShowAbout(true)} icon={Info} label="About" />

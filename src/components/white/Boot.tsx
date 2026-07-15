@@ -21,20 +21,21 @@ export function Boot() {
         const data = (await r.json()) as { prefs: UserPreferences };
         if (mounted && data.prefs) {
           setPrefsFull(data.prefs);
-          applyTheme(data.prefs.theme, data.prefs.accent, data.prefs.density, data.prefs.fontScale);
+          applyTheme(data.prefs.theme, data.prefs.accent, data.prefs.density, data.prefs.fontScale, data.prefs.customAccent);
         }
       } catch {
         if (mounted) {
           setPrefsFull({ ...DEFAULT_PREFS, sessionId: "anon" });
-          applyTheme(DEFAULT_PREFS.theme, DEFAULT_PREFS.accent, DEFAULT_PREFS.density, DEFAULT_PREFS.fontScale);
+          applyTheme(DEFAULT_PREFS.theme, DEFAULT_PREFS.accent, DEFAULT_PREFS.density, DEFAULT_PREFS.fontScale, DEFAULT_PREFS.customAccent);
         }
       }
 
-      // hydrate history + bookmarks in parallel
-      const [histRes, bmRes, popRes] = await Promise.allSettled([
+      // hydrate history + bookmarks + popular + domain rules in parallel
+      const [histRes, bmRes, popRes, domRes] = await Promise.allSettled([
         fetch("/api/history?limit=20", { cache: "no-store" }).then((r) => r.json()),
         fetch("/api/bookmarks", { cache: "no-store" }).then((r) => r.json()),
         fetch("/api/popular", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/domains", { cache: "no-store" }).then((r) => r.json()),
       ]);
 
       if (mounted && histRes.status === "fulfilled") {
@@ -61,6 +62,15 @@ export function Boot() {
       if (mounted && popRes.status === "fulfilled") {
         const pd = popRes.value as { topQueries: PopularQuery[]; topHosts: PopularHost[] };
         setPopular(pd.topQueries ?? [], pd.topHosts ?? []);
+      }
+
+      if (mounted && domRes.status === "fulfilled") {
+        const dd = domRes.value as { rules: { id: string; host: string; action: "raise" | "lower" | "block"; updatedAt: string }[] };
+        if (dd.rules) {
+          useWhite.getState().setDomainRules(
+            dd.rules.map((r) => ({ id: r.id, host: r.host, action: r.action, updatedAt: r.updatedAt }))
+          );
+        }
       }
     })();
 

@@ -10,6 +10,7 @@ import { SettingsSheet } from "@/components/white/SettingsSheet";
 import { ShortcutsHelp } from "@/components/white/ShortcutsHelp";
 import { MarkovInspector } from "@/components/white/MarkovInspector";
 import { BookmarksDialog } from "@/components/white/BookmarksDialog";
+import { DomainRulesDialog } from "@/components/white/DomainRulesDialog";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { SearchCategory } from "@/lib/types";
 
@@ -120,6 +121,7 @@ export default function Page() {
       <ShortcutsHelp />
       <MarkovInspector />
       <BookmarksDialog onPick={handleSubmit} />
+      <DomainRulesDialog />
     </>
   );
 }

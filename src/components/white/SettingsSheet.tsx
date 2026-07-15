@@ -30,7 +30,7 @@ export function SettingsSheet() {
   const save = (patch: Partial<typeof prefs>) => {
     const next = { ...prefs, ...patch };
     setPrefs(patch);
-    applyTheme(next.theme, next.accent, next.density, next.fontScale);
+    applyTheme(next.theme, next.accent, next.density, next.fontScale, next.customAccent);
     fetch("/api/preferences", {
       method: "PUT",
       headers: { "content-type": "application/json" },
@@ -87,7 +87,7 @@ export function SettingsSheet() {
         ]);
         if (p.prefs) {
           setPrefs(p.prefs);
-          applyTheme(p.prefs.theme, p.prefs.accent, p.prefs.density, p.prefs.fontScale);
+          applyTheme(p.prefs.theme, p.prefs.accent, p.prefs.density, p.prefs.fontScale, p.prefs.customAccent);
         }
         if (h.history) setHistory(h.history);
         if (b.bookmarks) setBookmarks(b.bookmarks);
@@ -151,16 +151,16 @@ export function SettingsSheet() {
                   key={a.id}
                   type="button"
                   className="flex flex-col items-center gap-1.5"
-                  onClick={() => save({ accent: a.id as AccentName })}
+                  onClick={() => save({ accent: a.id as AccentName, customAccent: null })}
                 >
                   <span
                     className="size-9 rounded-full transition-all"
-                    data-active={prefs.accent === a.id}
+                    data-active={prefs.accent === a.id && !prefs.customAccent}
                     style={{
                       background: a.color,
-                      outline: prefs.accent === a.id ? "2px solid var(--ws-bg)" : "none",
+                      outline: prefs.accent === a.id && !prefs.customAccent ? "2px solid var(--ws-bg)" : "none",
                       boxShadow:
-                        prefs.accent === a.id
+                        prefs.accent === a.id && !prefs.customAccent
                           ? `0 0 0 2px ${a.color}`
                           : "0 0 0 1px color-mix(in srgb, var(--ws-accent) 10%, transparent)",
                     }}
@@ -168,6 +168,29 @@ export function SettingsSheet() {
                   <span className="text-[11px] font-medium text-foreground/70">{a.name}</span>
                 </button>
               ))}
+              {/* custom color picker */}
+              <label className="flex cursor-pointer flex-col items-center gap-1.5" title="Custom accent color">
+                <span
+                  className="relative size-9 overflow-hidden rounded-full transition-all"
+                  data-active={!!prefs.customAccent}
+                  style={{
+                    background: prefs.customAccent ?? "conic-gradient(from 0deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #b39ddb, #ff6b6b)",
+                    outline: prefs.customAccent ? "2px solid var(--ws-bg)" : "none",
+                    boxShadow: prefs.customAccent
+                      ? `0 0 0 2px ${prefs.customAccent}`
+                      : "0 0 0 1px color-mix(in srgb, var(--ws-accent) 10%, transparent)",
+                  }}
+                >
+                  <input
+                    type="color"
+                    value={prefs.customAccent ?? "#1a1a1a"}
+                    onChange={(e) => save({ customAccent: e.target.value })}
+                    className="absolute inset-0 size-full cursor-pointer opacity-0"
+                    aria-label="Pick custom accent color"
+                  />
+                </span>
+                <span className="text-[11px] font-medium text-foreground/70">Custom</span>
+              </label>
             </div>
           </section>
 
@@ -303,6 +326,7 @@ export function SettingsSheet() {
                     markovEnabled: true,
                     suggestionCount: 8,
                     accent: "graphite",
+                    customAccent: null,
                   })
                 }
                 className="flex items-center justify-center gap-2 rounded-xl ws-hairline px-4 py-2.5 text-[13px] font-medium hover:ws-whisper transition-colors"

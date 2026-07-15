@@ -9,15 +9,20 @@ import {
 } from "@/components/ui/dialog";
 import { useWhite } from "@/lib/store";
 
-const SHORTCUTS: { keys: string[]; label: string }[] = [
-  { keys: ["/"], label: "Focus the search field" },
-  { keys: ["Esc"], label: "Go home / close overlay" },
-  { keys: ["?"], label: "Show this help" },
-  { keys: ["g", "h"], label: "Go home" },
-  { keys: ["g", "s"], label: "Open Customize" },
-  { keys: ["g", "a"], label: "Open About" },
-  { keys: ["g", "b"], label: "Open Bookmarks" },
-  { keys: ["g", "m"], label: "Open Markov Inspector" },
+const SHORTCUTS: { keys: string[]; label: string; group: string }[] = [
+  { keys: ["/"], label: "Focus the search field", group: "Search" },
+  { keys: ["Esc"], label: "Go home / close overlay", group: "Search" },
+  { keys: ["?"], label: "Show this help", group: "Search" },
+  { keys: ["j"], label: "Next result", group: "Results" },
+  { keys: ["k"], label: "Previous result", group: "Results" },
+  { keys: ["Enter"], label: "Read focused result (preview)", group: "Results" },
+  { keys: ["o"], label: "Open focused result in new tab", group: "Results" },
+  { keys: ["g", "h"], label: "Go home", group: "Navigation" },
+  { keys: ["g", "s"], label: "Open Customize", group: "Navigation" },
+  { keys: ["g", "a"], label: "Open About", group: "Navigation" },
+  { keys: ["g", "b"], label: "Open Bookmarks", group: "Navigation" },
+  { keys: ["g", "m"], label: "Open Markov Inspector", group: "Navigation" },
+  { keys: ["g", "d"], label: "Open Domain ranking", group: "Navigation" },
 ];
 
 function Kbd({ children }: { children: React.ReactNode }) {
@@ -46,26 +51,33 @@ export function ShortcutsHelp() {
             Friction-less by design. Keep your hands on the keyboard.
           </DialogDescription>
         </DialogHeader>
-        <div className="px-7 pb-7">
-          <ul className="flex flex-col gap-1">
-            {SHORTCUTS.map((s) => (
-              <li
-                key={s.label}
-                className="flex items-center justify-between gap-4 rounded-lg px-2 py-2 hover:ws-whisper transition-colors"
-              >
-                <span className="text-[13.5px] text-foreground/75">{s.label}</span>
-                <span className="flex items-center gap-1">
-                  {s.keys.map((k, i) => (
-                    <span key={i} className="flex items-center gap-1">
-                      {i > 0 && <span className="text-[10px] text-foreground/30">then</span>}
-                      <Kbd>{k}</Kbd>
+        <div className="px-7 pb-7 ws-scroll max-h-[60vh] overflow-y-auto">
+          {["Search", "Results", "Navigation"].map((group) => (
+            <div key={group} className="mb-4 last:mb-0">
+              <h3 className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-foreground/40">
+                {group}
+              </h3>
+              <ul className="flex flex-col gap-0.5">
+                {SHORTCUTS.filter((s) => s.group === group).map((s) => (
+                  <li
+                    key={s.label}
+                    className="flex items-center justify-between gap-4 rounded-lg px-2 py-2 hover:ws-whisper transition-colors"
+                  >
+                    <span className="text-[13.5px] text-foreground/75">{s.label}</span>
+                    <span className="flex items-center gap-1">
+                      {s.keys.map((k, i) => (
+                        <span key={i} className="flex items-center gap-1">
+                          {i > 0 && <span className="text-[10px] text-foreground/30">then</span>}
+                          <Kbd>{k}</Kbd>
+                        </span>
+                      ))}
                     </span>
-                  ))}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-5 text-center text-[11px] text-foreground/40">
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          <p className="mt-3 text-center text-[11px] text-foreground/40">
             Shortcuts are disabled while typing in a field.
           </p>
         </div>
