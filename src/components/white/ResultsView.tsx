@@ -12,6 +12,7 @@ import { HistoryPanel } from "./HistoryPanel";
 import { ReadingPane } from "./ReadingPane";
 import { useWhite } from "@/lib/store";
 import type { SearchCategory, SearchResponse, SearchResultItem } from "@/lib/types";
+import { InstantAnswerCard, type InstantAnswerData } from "./InstantAnswerCard";
 
 interface ResultsViewProps {
   query: string;
@@ -43,12 +44,32 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [meta, setMeta] = useState<{ tookMs: number; total: number; cached: boolean } | null>(null);
+    const [instantAnswer, setInstantAnswer] = useState<InstantAnswerData | null>(null);
     const reqIdRef = useRef(0);
     const searchRef = useRef<SearchBoxHandle>(null);
 
     useImperativeHandle(ref, () => ({
       focusSearch: () => searchRef.current?.focus(),
     }));
+
+    // fetch instant answer (math, unit, time, definition) alongside search
+    useEffect(() => {
+      if (!query.trim() || category !== "web") {
+        setInstantAnswer(null);
+        return;
+      }
+      let active = true;
+      (async () => {
+        try {
+          const r = await fetch(`/api/answer?q=${encodeURIComponent(query)}`, { cache: "no-store" });
+          const d = await r.json();
+          if (active) setInstantAnswer(d.answer ?? null);
+        } catch {
+          if (active) setInstantAnswer(null);
+        }
+      })();
+      return () => { active = false; };
+    }, [query, category]);
 
     const runSearch = useCallback(async (q: string, c: SearchCategory) => {
       if (!q.trim()) return;
@@ -244,6 +265,13 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
 
         {/* Results */}
         <main className="mx-auto w-full max-w-3xl flex-1 px-2 pb-10 md:px-6">
+          {/* Instant answer (math, unit, time, definition) */}
+          {instantAnswer && (
+            <div className="mt-3">
+              <InstantAnswerCard answer={instantAnswer} />
+            </div>
+          )}
+
           <div className="mt-3 ws-hairline overflow-hidden rounded-2xl ws-surface">
             <ResultList items={results} loading={loading} query={query} focusedIndex={focusedIndex} />
           </div>

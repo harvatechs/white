@@ -6,6 +6,7 @@ import { Search, X, ArrowRight, Sparkles, Clock, TrendingUp } from "lucide-react
 import { cn } from "@/lib/utils";
 import { useWhite } from "@/lib/store";
 import type { SuggestionItem } from "@/lib/types";
+import { VoiceSearchButton } from "./VoiceSearchButton";
 
 export interface SearchBoxHandle {
   focus: () => void;
@@ -190,6 +191,13 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
               <X className="size-4" />
             </button>
           )}
+          <VoiceSearchButton
+            onTranscript={(text) => {
+              setValue(text);
+              submit(text);
+            }}
+            size={isLg ? "md" : "sm"}
+          />
           {value.trim() && (
             <button
               type="button"

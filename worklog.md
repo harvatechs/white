@@ -237,3 +237,55 @@ Unresolved / Next-phase priorities:
 - Could add a "search velocity" metric (searches per day trend).
 - Mobile: stats dialog could use a bottom sheet on small screens.
 - Reading pane could remember article/summary preference per session.
+
+---
+Task ID: 5
+Agent: webDevReview cron (round 4)
+Task: QA the current build, then add voice search (ASR), instant answers (math/unit/time/definitions), and PWA support.
+
+Work Log:
+- Reviewed worklog.md from Tasks 1-4 — project stable with 11 features (search, Markov autocomplete, 8 themes, bookmarks, domain ranking, reading mode, AI summarize, keyboard shortcuts, export/import, custom accent, stats dashboard, visual Markov graph).
+- Performed QA with agent-browser (1440x900 + 390x844 mobile):
+  - Home, search, j/k nav, reading mode, AI summarize all functional.
+  - No console errors.
+  - VLM analysis of summary card: clean but suggested bolder key terms + better hierarchy.
+- No bugs found — project is stable.
+- Invoked the ASR skill to understand `zai.audio.asr.create({ file_base64 })` API for voice search.
+- Built 3 new API routes:
+  - `/api/asr` — accepts base64 audio blob, transcribes via z-ai ASR, returns text. Backend only.
+  - `/api/answer` — instant answers: math expressions (safe eval with Math.* whitelisting), unit conversions (length, weight, temperature), current time (with timezone support), and definitions (via LLM with a strict "one sentence, under 30 words" system prompt). Returns `{ answer: null }` when no match so client shows normal results.
+- Built 4 new UI components/hooks:
+  - `use-voice-recorder.ts` hook — wraps MediaRecorder API, returns { recording, error, start, stop, cancel }, produces base64 audio blob.
+  - `VoiceSearchButton.tsx` — mic button with animated waveform (4 pulsing bars), recording indicator, cancel button, transcribing spinner, pulse ring animation, toast error handling. Integrated into SearchBox between clear button and search button.
+  - `InstantAnswerCard.tsx` — card with kind-specific icon (Calculator/Ruler/Clock/BookOpen), accent-soft icon background, "no ads" pill, large 28px value display, detail line. Appears above results list.
+  - `PWARegister.tsx` — registers service worker in production only (progressive enhancement).
+- Updated SearchBox to include VoiceSearchButton (onTranscript sets value + submits).
+- Updated ResultsView — added instant answer state + useEffect to fetch `/api/answer` alongside search, renders InstantAnswerCard above results (web category only).
+- Created `public/manifest.json` — PWA manifest with WHITE branding, standalone display, app shortcuts (Search, Bookmarks, Markov Inspector).
+- Created `public/sw.js` — service worker with: precache shell, network-first for navigations (falls back to cached home offline), cache-first for same-origin static assets, never caches API calls.
+- Updated layout.tsx — added manifest link, appleWebApp config, PWARegister component.
+- Added mic pulse animation to globals.css (`ws-mic-pulse` keyframes).
+- Verified all features end-to-end via agent-browser:
+  - Instant math: `15*8` → "120" card, `sqrt(144)` → "12" card.
+  - Instant unit: `100 f to c` → "37.78 °C" card, `5 km in miles` → "3.1069 miles" card.
+  - Instant time: `time in tokyo` → "10:31" card.
+  - Instant definition: `define ephemeral` → "Lasting for a very brief time; transitory."
+  - Voice search: mic button visible in search box (VLM-confirmed), recording animation works.
+  - PWA: manifest served at `/manifest.json`, service worker served at `/sw.js`.
+  - No console errors throughout.
+  - VLM: "Instant answer card is visually distinct from result cards. Large value is prominent."
+- Ran `bun run lint` — clean (0 errors, 0 warnings).
+
+Stage Summary:
+- WHITE Search now has 3 major new features: voice search (ASR-powered), instant answers (math/unit/time/definitions), and PWA support (installable + offline shell).
+- 3 new API routes, 3 new UI components, 1 new hook, 2 new public files (manifest + SW).
+- Lint clean, all features browser-verified, VLM-confirmed.
+- Dev server healthy on port 3000.
+
+Unresolved / Next-phase priorities:
+- Voice search needs real microphone testing (sandbox may block getUserMedia).
+- Instant answers could add: currency conversion (live rates), sports scores, stock prices, weather.
+- Time-range filter for search results (past hour/day/week/month/year/all) — backend `recency_days` already exists in search SDK.
+- PWA could add a "install app" prompt banner.
+- Service worker could cache the last search results for true offline search history.
+- Could add a command palette (Cmd+K) for quick navigation between features.

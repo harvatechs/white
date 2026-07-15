@@ -425,6 +425,13 @@ input:focus-visible {
   animation: ws-bookmark-pop 0.32s ease-out;
 }
 
+/* Mic recording pulse ring */
+@keyframes ws-mic-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--destructive) 50%, transparent); }
+  70% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--destructive) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--destructive) 0%, transparent); }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,

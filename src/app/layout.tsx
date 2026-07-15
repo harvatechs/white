@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { PWARegister } from "@/components/white/PWARegister";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,8 +32,18 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "WHITE Search" }],
   applicationName: "WHITE Search",
+  manifest: "/manifest.json",
   icons: {
     icon: [
+      {
+        url:
+          "data:image/svg+xml," +
+          encodeURIComponent(
+            `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.5"/><circle cx="16" cy="16" r="4" fill="#1a1a1a"/></svg>`
+          ),
+      },
+    ],
+    apple: [
       {
         url:
           "data:image/svg+xml," +
@@ -52,6 +63,11 @@ export const metadata: Metadata = {
     card: "summary",
     title: "WHITE Search",
     description: "The world's cleanest search engine. No ads. No sponsors. Just answers.",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "WHITE Search",
   },
 };
 
@@ -73,6 +89,7 @@ export default function RootLayout({
         style={{ background: "var(--ws-bg)" }}
       >
         {children}
+        <PWARegister />
         <Toaster />
         <SonnerToaster position="top-center" />
       </body>
