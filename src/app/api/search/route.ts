@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
   const q = (sp.get("q") ?? "").trim();
   const category = (sp.get("c") as SearchCategory) || "web";
   const num = Math.min(parseInt(sp.get("num") ?? "12", 10) || 12, 30);
+  const page = Math.max(1, parseInt(sp.get("p") ?? "1", 10) || 1);
   const recency = sp.get("r");
   const recencyDays = recency ? parseInt(recency, 10) : undefined;
   const algo = (sp.get("a") as SearchAlgorithm) || "relevance";
@@ -26,7 +27,9 @@ export async function GET(req: NextRequest) {
 
   try {
     await ensureSeed();
-    const res = await runSearch(q, category, num, recencyDays && recencyDays > 0 ? recencyDays : undefined);
+    // Fetch more results for pagination (page * num, capped at 30)
+    const fetchNum = Math.min(page * num, 30);
+    const res = await runSearch(q, category, fetchNum, recencyDays && recencyDays > 0 ? recencyDays : undefined);
 
     const sessionId = await getOrCreateSessionId();
 
@@ -105,19 +108,33 @@ export async function GET(req: NextRequest) {
     }
 
     // learn from this query (Markov) + persist to history (dedupe consecutive identical)
-    await learnQuery(q).catch(() => {});
-    const last = await db.searchHistory.findFirst({
-      orderBy: { createdAt: "desc" },
-      select: { query: true, category: true },
-    });
-    const isDupe = last?.query === q && last?.category === category;
-    if (!isDupe) {
-      await db.searchHistory
-        .create({ data: { query: q, category, resultsCount: res.total } })
-        .catch(() => {});
+    // Only learn on page 1 to avoid duplicate history entries
+    if (page === 1) {
+      await learnQuery(q).catch(() => {});
+      const last = await db.searchHistory.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { query: true, category: true },
+      });
+      const isDupe = last?.query === q && last?.category === category;
+      if (!isDupe) {
+        await db.searchHistory
+          .create({ data: { query: q, category, resultsCount: res.total } })
+          .catch(() => {});
+      }
     }
 
-    return NextResponse.json(res);
+    // Slice results for the requested page
+    const startIdx = (page - 1) * num;
+    const pageResults = res.results.slice(startIdx, startIdx + num);
+
+    return NextResponse.json({
+      ...res,
+      results: pageResults,
+      total: res.total,
+      page,
+      pageSize: num,
+      hasMore: startIdx + num < res.results.length,
+    });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "search failed";
     console.error("[/api/search] error", e);

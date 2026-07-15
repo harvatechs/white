@@ -8,7 +8,7 @@ import type { AccentName, Density, FontScale, SearchAlgorithm, UserPreferences, 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const VALID_THEMES: WhiteTheme[] = ["pure","ivory","snow","pearl","alabaster","ghost","seashell","mint"];
+const VALID_THEMES: WhiteTheme[] = ["pure","ivory","snow","pearl","alabaster","ghost","seashell","mint","midnight","charcoal","slate"];
 const VALID_DENSITY: Density[] = ["comfortable","compact","airy"];
 const VALID_FONT: FontScale[] = ["small","base","large"];
 const VALID_ACCENT: AccentName[] = ["graphite","sage","rose","amber","slate"];

@@ -12,6 +12,8 @@ import { HistoryPanel } from "./HistoryPanel";
 import { ReadingPane } from "./ReadingPane";
 import { ImageGrid } from "./ImageGrid";
 import { RelatedSearches } from "./RelatedSearches";
+import { Pagination } from "./Pagination";
+import { ShareButton } from "./ShareButton";
 import { useWhite } from "@/lib/store";
 import type { SearchCategory, SearchResponse, SearchResultItem } from "@/lib/types";
 import { InstantAnswerCard, type InstantAnswerData } from "./InstantAnswerCard";
@@ -52,6 +54,8 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
     const [meta, setMeta] = useState<{ tookMs: number; total: number; cached: boolean } | null>(null);
     const [instantAnswer, setInstantAnswer] = useState<InstantAnswerData | null>(null);
     const [related, setRelated] = useState<{ text: string; source: string }[]>([]);
+    const [page, setPage] = useState(1);
+    const pageSize = 10;
     const reqIdRef = useRef(0);
     const searchRef = useRef<SearchBoxHandle>(null);
 
@@ -99,8 +103,9 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
 
     const prefs = useWhite((s) => s.prefs);
 
-    const runSearch = useCallback(async (q: string, c: SearchCategory, r?: TimeRange) => {
+    const runSearch = useCallback(async (q: string, c: SearchCategory, r?: TimeRange, p?: number) => {
       if (!q.trim()) return;
+      const pageNum = p ?? 1;
       setLoading(true);
       setError(null);
       setFocusedIndex(-1);
@@ -108,16 +113,27 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       const range = r ?? timeRange;
       const days = range === "all" ? "" : `&r=${TIME_RANGE_DAYS[range]}`;
       const algo = `&a=${prefs.searchAlgorithm}`;
+      const pageParam = `&p=${pageNum}&num=${pageSize}`;
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&c=${c}&num=15${days}${algo}`);
-        const data = (await res.json()) as SearchResponse;
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&c=${c}${pageParam}${days}${algo}`);
+        const data = (await res.json()) as SearchResponse & { error?: string };
         if (myReq === reqIdRef.current) {
-          setResults(data.results ?? []);
-          setMeta({ tookMs: data.tookMs, total: data.total, cached: data.cached });
+          if (!res.ok && data.error) {
+            setError(
+              data.error.includes("429") || data.error.includes("Too many requests")
+                ? "The search service is busy. Please wait a moment and try again."
+                : "Something went wrong. Please try again."
+            );
+            setResults([]);
+            setMeta(null);
+          } else {
+            setResults(data.results ?? []);
+            setMeta({ tookMs: data.tookMs, total: data.total, cached: data.cached });
+          }
         }
       } catch {
         if (myReq === reqIdRef.current) {
-          setError("Something went wrong. Please try again.");
+          setError("Network error. Please check your connection and try again.");
           setResults([]);
         }
       } finally {
@@ -126,7 +142,8 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
     }, [setFocusedIndex, timeRange, prefs.searchAlgorithm]);
 
     useEffect(() => {
-      runSearch(query, category);
+      setPage(1);
+      runSearch(query, category, undefined, 1);
     }, [query, category, runSearch]);
 
     // refresh history after a search completes
@@ -241,6 +258,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
                   </span>
                 )}
               </button>
+              <ShareButton query={query} category={category} />
               <button
                 type="button"
                 onClick={() => setShowShortcuts(true)}
@@ -334,9 +352,25 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
               <ImageGrid items={results} loading={loading} query={query} />
             </div>
           ) : (
-            <div className="mt-3 ws-hairline overflow-hidden rounded-2xl ws-surface">
-              <ResultList items={results} loading={loading} query={query} focusedIndex={focusedIndex} />
-            </div>
+            <>
+              <div className="mt-3 ws-hairline overflow-hidden rounded-2xl ws-surface">
+                <ResultList items={results} loading={loading} query={query} focusedIndex={focusedIndex} />
+              </div>
+              {/* Pagination */}
+              {!loading && meta && meta.total > pageSize && (
+                <Pagination
+                  page={page}
+                  total={meta.total}
+                  pageSize={pageSize}
+                  loading={loading}
+                  onPageChange={(p) => {
+                    setPage(p);
+                    runSearch(query, category, undefined, p);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                />
+              )}
+            </>
           )}
 
           {!loading && history.length > 0 && category !== "images" && (

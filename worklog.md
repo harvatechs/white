@@ -485,3 +485,58 @@ Unresolved / Next-phase priorities:
 - Lightbox could support image download.
 - Related searches could be personalized based on click history.
 - Could add a "safe search" toggle in the header for explicit content filtering.
+
+---
+Task ID: 9
+Agent: webDevReview cron (round 7)
+Task: QA the current build, fix 429 error handling bug, then add pagination, share button, and dark mode themes.
+
+Work Log:
+- Reviewed worklog.md from Tasks 1-8 — project stable with image grid + lightbox, algorithm badge, related searches.
+- Performed QA with agent-browser (1440x900):
+  - Found a client-side crash ("Application error") when the search API returns 429 rate limit errors.
+  - Root cause: ResultsView's runSearch didn't check `res.ok` or `data.error` — it just set `data.results` (empty) without showing an error message, and the 500 response caused a React rendering issue.
+- FIXED the 429 error handling bug:
+  - Updated `runSearch` in ResultsView to check `!res.ok && data.error`.
+  - Shows a friendly "The search service is busy. Please wait a moment and try again." message for 429 errors.
+  - Shows "Something went wrong" for other errors, "Network error" for fetch failures.
+  - Sets `meta` to null on error so the meta bar doesn't render broken state.
+- Built search result pagination:
+  - New `Pagination.tsx` component: compact page selector with prev/next arrows, numbered pages with ellipsis for large ranges, active page highlighted with accent color, loading spinner on active page during fetch.
+  - Updated `/api/search` to accept `p` (page) and `num` (page size) params. Fetches `page * num` results (capped at 30), slices for the requested page. Returns `page`, `pageSize`, `hasMore` metadata.
+  - Added `page` state to ResultsView, resets to 1 on query/category change.
+  - Pagination renders below results when `total > pageSize`.
+  - Smooth scroll to top on page change.
+- Built share/copy link button:
+  - New `ShareButton.tsx` component: uses `navigator.share` if available (mobile), falls back to `navigator.clipboard.writeText`.
+  - Animated icon swap (Share2 → Check) with framer-motion on copy.
+  - Toast notification "Link copied" on success.
+  - Added to results header between Bookmarks and Shortcuts.
+- Added dark mode theme support:
+  - 3 new dark themes: Midnight (#0a0a0b), Charcoal (#18181b), Slate Dark (#1e293b).
+  - Updated `applyTheme` to detect dark themes and set appropriate foreground colors (light text on dark bg), border colors (white/8% opacity), input colors, muted-foreground, and `color-scheme`.
+  - Updated `WhiteTheme` type to include "midnight", "charcoal", "slate".
+  - Updated preferences API VALID_THEMES to accept the 3 new dark themes.
+  - VLM-confirmed: "Dark theme is clean and readable. Text contrast is good. No major issues."
+- Verified all features end-to-end via agent-browser:
+  - 429 error handling: friendly error message instead of crash.
+  - Pagination: renders when results > pageSize, page navigation works.
+  - Share button: present in header, click triggers copy (toast may not show in headless).
+  - Dark themes: Midnight changes bg to #0a0a0b, foreground to #e8e8ea.
+  - Algorithm badge: "relevance" pill visible.
+  - No console errors on successful loads.
+  - Lint clean (0 errors, 0 warnings).
+
+Stage Summary:
+- WHITE Search now has 3 major new features: pagination, share button, and dark mode (3 dark themes).
+- 1 critical bug fixed (429 error handling crash).
+- 3 new UI components (Pagination, ShareButton, dark theme support), 1 API update (pagination).
+- Lint clean, VLM-confirmed dark theme quality.
+- Dev server healthy on port 3000.
+
+Unresolved / Next-phase priorities:
+- Search history timeline view with searchable filter (pending).
+- Share button needs HTTPS testing for clipboard API.
+- Dark themes could have dedicated dark-mode accent presets.
+- Pagination could support "load more" infinite scroll as an alternative.
+- Could add keyboard shortcuts for pagination (left/right arrows when not in input).

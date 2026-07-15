@@ -43,7 +43,10 @@ export type WhiteTheme =
   | "alabaster"
   | "ghost"
   | "seashell"
-  | "mint";
+  | "mint"
+  | "midnight"
+  | "charcoal"
+  | "slate";
 
 export type Density = "comfortable" | "compact" | "airy";
 export type FontScale = "small" | "base" | "large";

@@ -77,6 +77,31 @@ export const THEMES: ThemeDef[] = [
     whisper: "#dcefdf",
     description: "A whisper of green. Clean as morning air.",
   },
+  // Dark themes — the same clean philosophy, inverted
+  {
+    id: "midnight",
+    name: "Midnight",
+    swatch: "#0a0a0b",
+    surface: "#131316",
+    whisper: "#1c1c20",
+    description: "Pure dark. The night sky of search.",
+  },
+  {
+    id: "charcoal",
+    name: "Charcoal",
+    swatch: "#18181b",
+    surface: "#1e1e22",
+    whisper: "#27272a",
+    description: "Warm dark gray. Easy on the eyes after sunset.",
+  },
+  {
+    id: "slate",
+    name: "Slate Dark",
+    swatch: "#1e293b",
+    surface: "#243044",
+    whisper: "#334155",
+    description: "Cool blue-dark. Focused and calm.",
+  },
 ];
 
 export const THEME_MAP: Record<WhiteTheme, ThemeDef> = THEMES.reduce(
@@ -116,6 +141,12 @@ export const FONT_SCALE_CLASS: Record<FontScale, string> = {
   large: "text-[17px]",
 };
 
+// Dark theme detection
+export const DARK_THEMES: WhiteTheme[] = ["midnight", "charcoal", "slate"];
+export function isDarkTheme(theme: WhiteTheme): boolean {
+  return DARK_THEMES.includes(theme);
+}
+
 // Apply a theme + accent + density to :root as CSS custom properties + data attrs.
 // If customAccentHex is provided, it overrides the preset accent color.
 export function applyTheme(
@@ -139,6 +170,18 @@ export function applyTheme(
   root.style.setProperty("--ws-accent-rgb", hexToRgb(accentColor));
   root.dataset.wsTheme = theme;
   root.dataset.wsAccent = customAccentHex ? "custom" : accent;
+
+  // Set foreground color based on whether this is a dark theme
+  const dark = isDarkTheme(theme);
+  root.style.setProperty("--foreground", dark ? "#e8e8ea" : "#1a1a1a");
+  root.style.setProperty("--background", t.swatch);
+  root.style.setProperty("--card", t.surface);
+  root.style.setProperty("--card-foreground", dark ? "#e8e8ea" : "#1a1a1a");
+  root.style.setProperty("--border", dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)");
+  root.style.setProperty("--input", dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)");
+  root.style.setProperty("--muted-foreground", dark ? "rgba(232,232,234,0.55)" : "rgba(26,26,26,0.55)");
+  root.style.colorScheme = dark ? "dark" : "light";
+
   if (density) root.dataset.density = density;
   if (fontScale) root.dataset.fontScale = fontScale;
 }
