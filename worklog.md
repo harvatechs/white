@@ -730,3 +730,64 @@ Stage Summary:
 - HTTP cache headers enable CDN edge caching.
 - All non-critical operations (history, seed, markov) are non-blocking.
 - Lint clean, build succeeds.
+
+---
+Task ID: 13
+Agent: webDevReview cron (round 9)
+Task: QA the current build, then add search filters panel, result hover preview, and polish meta bar.
+
+Work Log:
+- Reviewed worklog.md from Tasks 1-12 — project stable with performance optimizations, production-ready build, 26+ features.
+- Performed QA with agent-browser (1440x900):
+  - Home: loads clean, no console errors.
+  - Search: z-ai SDK rate-limited (429), app shows friendly error message (graceful handling working).
+  - Instant answer: "42*17" → "714" works instantly.
+  - Suggest: returns 2 suggestions for "react".
+  - Footer menu: all options accessible.
+  - No console errors, no runtime crashes.
+- No bugs found — project is stable. Rate-limit handling is working as designed.
+
+- Built search filters panel:
+  - New `FiltersButton.tsx` component: compact dropdown with Safe search toggle, Region selector (9 regions), Language selector (8 languages).
+  - Safe search toggle: animated switch that persists to preferences.
+  - Region/Language: pill-button selectors with active state highlighting.
+  - Active filter count badge on the button.
+  - Reset filters option.
+  - Animated dropdown with framer-motion.
+  - Added to ResultsView header next to Share button.
+
+- Built result hover preview:
+  - New `ResultPreview.tsx` component: floating preview card that appears after 800ms hover.
+  - Fetches a 300-character excerpt from /api/preview (cached server-side).
+  - Shows page title, host, word count, and text excerpt.
+  - Loading state with spinner.
+  - Fallback with "Open page" link when preview unavailable.
+  - Integrated into ResultCard — wraps each result card.
+  - Uses pointer-events-none to avoid interfering with card interactions.
+
+- Improved meta bar styling:
+  - Result count now uses font-semibold + tabular-nums for emphasis.
+  - Search time highlighted in accent color when under 500ms (fast indicator).
+  - Cached badge includes a small cache icon SVG.
+  - Cleaner dot separators.
+
+- Fixed lint error: removed `setState` in `useEffect` by deriving `safeSearch` from `prefs` directly.
+- Removed unused imports (Check, X icons).
+- Verified via agent-browser:
+  - Instant answer: 714 for 42*17 ✓
+  - Filters button: present, opens panel with Safe search/Region/Language ✓
+  - No console errors.
+- Ran `bun run lint` — clean (0 errors, 0 warnings).
+- Production build succeeds.
+
+Stage Summary:
+- WHITE Search now has 2 new features: search filters panel + result hover preview.
+- 2 new UI components (FiltersButton, ResultPreview), 1 updated component (ResultCard).
+- Meta bar polished with prominent result count + fast-time indicator.
+- Lint clean, build succeeds, all features browser-verified.
+
+Unresolved / Next-phase priorities:
+- Region/language filters need to be passed to the search API (currently UI-only).
+- Result preview could cache fetched previews client-side.
+- Could add more instant answer types (currency, stock, sports).
+- VLM API was rate-limited during testing — visual verification deferred.

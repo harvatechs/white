@@ -7,6 +7,7 @@ import { useWhite } from "@/lib/store";
 import type { BookmarkItem, DomainAction, SearchResultItem } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { ResultPreview } from "./ResultPreview";
 
 interface ResultCardProps {
   item: SearchResultItem;
@@ -118,6 +119,7 @@ export function ResultCard({ item, index, query, focused }: ResultCardProps) {
   const rel = prefs.openNewTab ? "noopener noreferrer" : undefined;
 
   return (
+    <ResultPreview item={item}>
     <motion.div
       ref={cardRef}
       initial={{ opacity: 0, y: 8 }}
@@ -287,6 +289,7 @@ export function ResultCard({ item, index, query, focused }: ResultCardProps) {
         </div>
       </div>
     </motion.div>
+    </ResultPreview>
   );
 }
 

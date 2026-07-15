@@ -14,6 +14,7 @@ import { ImageGrid } from "./ImageGrid";
 import { RelatedSearches } from "./RelatedSearches";
 import { Pagination } from "./Pagination";
 import { ShareButton } from "./ShareButton";
+import { FiltersButton } from "./FiltersButton";
 import { useWhite } from "@/lib/store";
 import type { SearchCategory, SearchResponse, SearchResultItem } from "@/lib/types";
 import { InstantAnswerCard, type InstantAnswerData } from "./InstantAnswerCard";
@@ -296,6 +297,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
                 )}
               </button>
               <ShareButton query={query} category={category} />
+              <FiltersButton />
               <button
                 type="button"
                 onClick={() => setShowShortcuts(true)}
@@ -330,11 +332,21 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
                 className="flex flex-wrap items-center gap-2 text-[12px] text-foreground/45"
               >
                 <span>
-                  About <span className="font-medium text-foreground/70">{meta.total}</span> clean results
-                  {meta.tookMs > 0 && <> · {(meta.tookMs / 1000).toFixed(2)}s</>}
+                  <span className="font-semibold tabular-nums text-foreground/75">{meta.total}</span> clean results
                 </span>
+                {meta.tookMs > 0 && (
+                  <span className="flex items-center gap-1">
+                    <span className="text-foreground/20">·</span>
+                    <span className="tabular-nums font-medium" style={{ color: meta.tookMs < 500 ? "var(--ws-accent)" : undefined }}>
+                      {(meta.tookMs / 1000).toFixed(2)}s
+                    </span>
+                  </span>
+                )}
                 {meta.cached && (
-                  <span className="ws-pill" style={{ opacity: 0.7 }}>cached</span>
+                  <span className="ws-pill" style={{ opacity: 0.7 }}>
+                    <svg className="size-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 12V8H6a2 2 0 0 1 0-4h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
+                    cached
+                  </span>
                 )}
                 {/* Algorithm indicator badge */}
                 {category !== "images" && (
