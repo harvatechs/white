@@ -2,7 +2,7 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Bookmark, Info, Keyboard, Sliders } from "lucide-react";
+import { ArrowLeft, Bookmark, Info, Keyboard, Sliders, Sparkles } from "lucide-react";
 import { SearchBox, type SearchBoxHandle } from "./SearchBox";
 import { WhiteLogo } from "./WhiteLogo";
 import { SearchTabs } from "./SearchTabs";
@@ -11,6 +11,7 @@ import { Footer } from "./Footer";
 import { HistoryPanel } from "./HistoryPanel";
 import { ReadingPane } from "./ReadingPane";
 import { ImageGrid } from "./ImageGrid";
+import { RelatedSearches } from "./RelatedSearches";
 import { useWhite } from "@/lib/store";
 import type { SearchCategory, SearchResponse, SearchResultItem } from "@/lib/types";
 import { InstantAnswerCard, type InstantAnswerData } from "./InstantAnswerCard";
@@ -50,6 +51,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
     const [error, setError] = useState<string | null>(null);
     const [meta, setMeta] = useState<{ tookMs: number; total: number; cached: boolean } | null>(null);
     const [instantAnswer, setInstantAnswer] = useState<InstantAnswerData | null>(null);
+    const [related, setRelated] = useState<{ text: string; source: string }[]>([]);
     const reqIdRef = useRef(0);
     const searchRef = useRef<SearchBoxHandle>(null);
 
@@ -71,6 +73,25 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
           if (active) setInstantAnswer(d.answer ?? null);
         } catch {
           if (active) setInstantAnswer(null);
+        }
+      })();
+      return () => { active = false; };
+    }, [query, category]);
+
+    // fetch related searches ("people also search")
+    useEffect(() => {
+      if (!query.trim() || category === "images") {
+        setRelated([]);
+        return;
+      }
+      let active = true;
+      (async () => {
+        try {
+          const r = await fetch(`/api/related?q=${encodeURIComponent(query)}`, { cache: "no-store" });
+          const d = await r.json();
+          if (active) setRelated(d.related ?? []);
+        } catch {
+          if (active) setRelated([]);
         }
       })();
       return () => { active = false; };
@@ -248,24 +269,37 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
         <div className="mx-auto w-full max-w-3xl px-4 md:px-6 pt-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             {!loading && meta && (
-              <motion.p
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-[12px] text-foreground/45"
+                className="flex flex-wrap items-center gap-2 text-[12px] text-foreground/45"
               >
-                About <span className="font-medium text-foreground/70">{meta.total}</span> clean results
-                {meta.tookMs > 0 && <> · {(meta.tookMs / 1000).toFixed(2)}s</>}
+                <span>
+                  About <span className="font-medium text-foreground/70">{meta.total}</span> clean results
+                  {meta.tookMs > 0 && <> · {(meta.tookMs / 1000).toFixed(2)}s</>}
+                </span>
                 {meta.cached && (
-                  <span className="ws-pill ml-2" style={{ opacity: 0.7 }}>
-                    cached
-                  </span>
+                  <span className="ws-pill" style={{ opacity: 0.7 }}>cached</span>
+                )}
+                {/* Algorithm indicator badge */}
+                {category !== "images" && (
+                  <button
+                    type="button"
+                    onClick={() => useWhite.getState().setShowSettings(true)}
+                    className="ws-pill transition-opacity hover:opacity-100"
+                    style={{ opacity: 0.85, cursor: "pointer" }}
+                    title="Change search algorithm"
+                  >
+                    <Sparkles className="size-2.5" strokeWidth={2.5} />
+                    {prefs.searchAlgorithm}
+                  </button>
                 )}
                 {focusedIndex >= 0 && (
-                  <span className="ml-3 text-foreground/35">
+                  <span className="ml-1 text-foreground/35">
                     <kbd className="mr-1">{focusedIndex + 1}</kbd>· <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>Enter</kbd> read · <kbd>o</kbd> open
                   </span>
                 )}
-              </motion.p>
+              </motion.div>
             )}
             <TimeRangeFilter
               value={timeRange}
@@ -309,6 +343,11 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
             <div className="mt-8">
               <HistoryPanel onPick={handleSubmit} compact />
             </div>
+          )}
+
+          {/* Related searches */}
+          {!loading && category !== "images" && related.length > 0 && (
+            <RelatedSearches items={related} onPick={handleNewQuery} />
           )}
         </main>
 

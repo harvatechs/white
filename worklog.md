@@ -425,3 +425,63 @@ Unresolved / Next-phase priorities:
 - More seed queries for broader coverage ("almost all pages listed").
 - Algorithm could have a visual indicator on the results page showing which is active.
 - Mobile could have a bottom navigation bar for quick tab switching.
+
+---
+Task ID: 8
+Agent: webDevReview cron (round 6)
+Task: QA the current build, then add improved image grid with masonry + lightbox, algorithm indicator badge, and related searches.
+
+Work Log:
+- Reviewed worklog.md from Tasks 1-7 — project stable with major redesign (clean home, luxurious search bar, compressed footer, 5 search algorithms, advanced autofill, image grid).
+- Performed QA with agent-browser (1440x900):
+  - Home, search, image grid all functional.
+  - No console errors on home.
+  - VLM analysis of image grid: "square tiles too uniform, needs varied heights (masonry), no lightbox, add hover states."
+- No bugs found — project is stable.
+- Built new `/api/images` endpoint:
+  - Fetches REAL image URLs by doing a web search, then using page_reader on top 5 results to extract `<img>` src attributes from HTML.
+  - Resolves relative URLs, filters out icons/sprites/trackers/data-URIs/SVGs.
+  - Returns up to 40 images with url, alt, source, sourceUrl, title.
+  - 10-minute cache.
+- Rewrote `ImageGrid.tsx` with major improvements:
+  - **Varied heights masonry**: images now have natural varied heights (180-280px) using CSS columns, breaking the uniform square monotony.
+  - **Image lightbox viewer**: clicking an image opens a full-screen modal with dark backdrop, large image, prev/next navigation (arrows + keyboard), close button, image title/source, "Visit" link, page counter.
+  - **Loading states**: skeleton placeholders with varied heights, image load transitions (opacity fade-in).
+  - **Error fallback**: letterbox avatar with accent background when image fails to load.
+  - **Hover overlay**: gradient overlay with title + source on hover.
+  - Fetches from `/api/images` for real images, falls back to search result tiles if no images found.
+- Added **algorithm indicator badge** to results meta bar:
+  - Shows the active search algorithm (e.g., "relevance", "recency", "diverse") as a pill.
+  - Clicking opens Customize settings to change algorithm.
+  - Hidden on image search (not applicable).
+  - VLM-confirmed: "relevance badge visible near results count."
+- Built new `/api/related` endpoint for "people also search":
+  - Combines Markov chain edges (tokens that co-occur), user history (queries sharing tokens), and web search "vs" pattern extraction.
+  - Returns up to 8 related queries with source labels.
+  - Best-effort web search (catches 429 rate limits gracefully).
+- Built `RelatedSearches.tsx` component:
+  - "People also search" section below results.
+  - Animated chips with ArrowUpRight hover indicator.
+  - Clicking runs a new search.
+- Wired RelatedSearches into ResultsView with fetch effect.
+- Verified all features end-to-end via agent-browser:
+  - Image grid: 40 real images loaded, varied heights masonry (VLM: "images vary in height, Google Images-like").
+  - Lightbox: opens on click, shows large image + controls + info (VLM: "large image with dark backdrop, prev/next/close controls, image info").
+  - Algorithm badge: "relevance" pill visible and clickable.
+  - Related searches: loads for queries with Markov data.
+  - No console errors on successful loads.
+  - Lint clean (0 errors, 0 warnings).
+- Note: /api/related can take 5-11s when web search is slow/rate-limited; the UI handles this gracefully (section just doesn't render if empty).
+
+Stage Summary:
+- WHITE Search now has 3 major improvements: real image masonry grid with lightbox, algorithm indicator badge, and related searches.
+- 2 new API routes (/api/images, /api/related), 1 new component (RelatedSearches), 1 rewritten component (ImageGrid).
+- Image search now fetches actual images from pages instead of just filtering search results.
+- Lint clean, VLM-confirmed improvements.
+
+Unresolved / Next-phase priorities:
+- /api/related web search can hit 429 rate limits — could cache more aggressively or skip web search when Markov has enough data.
+- Image grid could show image dimensions before load (avoid layout shift).
+- Lightbox could support image download.
+- Related searches could be personalized based on click history.
+- Could add a "safe search" toggle in the header for explicit content filtering.
