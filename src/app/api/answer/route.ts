@@ -20,7 +20,7 @@ async function getZai() {
 }
 
 interface InstantAnswer {
-  kind: "math" | "unit" | "time" | "definition" | "calc" | "weather";
+  kind: "math" | "unit" | "time" | "definition" | "calc" | "weather" | "currency";
   title: string;
   value: string;
   detail?: string;
@@ -242,6 +242,65 @@ async function tryWeather(q: string): Promise<InstantAnswer | null> {
   }
 }
 
+// --- Currency conversion (via web search, parsed) ---
+async function tryCurrency(q: string): Promise<InstantAnswer | null> {
+  const lower = q.toLowerCase().trim();
+  // Match "100 usd to eur", "100 dollars in euros", etc.
+  const m = lower.match(/^([\d,.]+)\s*(usd|dollars?|\$|eur|euros?|€|gbp|pounds?|£|jpy|yen|¥|inr|rupees?|₹|cny|yuan|rmb|cad|aud|chf|sgd)\s*(?:to|in|->|→)\s*(usd|dollars?|\$|eur|euros?|€|gbp|pounds?|£|jpy|yen|¥|inr|rupees?|₹|cny|yuan|rmb|cad|aud|chf|sgd)\b/);
+  if (!m) return null;
+  const amount = parseFloat(m[1].replace(/,/g, ""));
+  if (isNaN(amount)) return null;
+
+  // Normalize currency codes
+  const normalize = (s: string): string => {
+    const map: Record<string, string> = {
+      usd: "USD", dollar: "USD", dollars: "USD", "$": "USD",
+      eur: "EUR", euro: "EUR", euros: "EUR", "€": "EUR",
+      gbp: "GBP", pound: "GBP", pounds: "GBP", "£": "GBP",
+      jpy: "JPY", yen: "JPY", "¥": "JPY",
+      inr: "INR", rupee: "INR", rupees: "INR", "₹": "INR",
+      cny: "CNY", yuan: "CNY", rmb: "CNY",
+      cad: "CAD", aud: "AUD", chf: "CHF", sgd: "SGD",
+    };
+    return map[s] || s.toUpperCase();
+  };
+  const from = normalize(m[2]);
+  const to = normalize(m[3]);
+
+  if (from === to) {
+    return { kind: "currency", title: "Currency conversion", value: `${amount.toLocaleString()} ${to}`, detail: `Same currency` };
+  }
+
+  try {
+    const zai = await getZai();
+    const results = (await zai.functions.invoke("web_search", {
+      query: `${amount} ${from} to ${to} exchange rate`,
+      num: 3,
+    })) as { name?: string; snippet?: string; host_name?: string }[];
+
+    // Look for a converted amount in results (e.g., "100 USD = 91.23 EUR")
+    const ratePattern = /([\d,.]+)\s*(?:EUR|USD|GBP|JPY|INR|CNY|CAD|AUD|CHF|SGD)/i;
+    for (const r of results) {
+      const text = `${r.name ?? ""} ${r.snippet ?? ""}`;
+      const rateMatch = text.match(ratePattern);
+      if (rateMatch) {
+        const converted = parseFloat(rateMatch[1].replace(/,/g, ""));
+        if (!isNaN(converted) && converted > 0) {
+          return {
+            kind: "currency",
+            title: "Currency conversion",
+            value: `${converted.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${to}`,
+            detail: `${amount.toLocaleString()} ${from} = ${converted.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${to} · via ${r.host_name ?? "web"}`,
+          };
+        }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
   if (!q) return NextResponse.json({ answer: null });
@@ -260,6 +319,10 @@ export async function GET(req: NextRequest) {
     // weather needs a web search
     const weather = await tryWeather(q);
     if (weather) return NextResponse.json({ answer: weather });
+
+    // currency needs a web search
+    const currency = await tryCurrency(q);
+    if (currency) return NextResponse.json({ answer: currency });
 
     // definition needs LLM — only for "define X" style queries
     const def = await tryDefinition(q);

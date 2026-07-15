@@ -68,6 +68,9 @@ interface WhiteStore {
   focusedIndex: number;
   // time range filter
   timeRange: TimeRange;
+  // search filters
+  filterRegion: string;
+  filterLanguage: string;
 
   setView: (v: ViewState) => void;
   setQuery: (q: string) => void;
@@ -97,6 +100,8 @@ interface WhiteStore {
   setPreview: (p: WhiteStore["preview"]) => void;
   setFocusedIndex: (i: number | ((prev: number) => number)) => void;
   setTimeRange: (r: TimeRange) => void;
+  setFilterRegion: (r: string) => void;
+  setFilterLanguage: (l: string) => void;
 
   resetToHome: () => void;
 }
@@ -128,6 +133,8 @@ export const useWhite = create<WhiteStore>((set, get) => ({
   preview: null,
   focusedIndex: -1,
   timeRange: "all" as TimeRange,
+  filterRegion: "all",
+  filterLanguage: "all",
 
   setView: (v) => set({ view: v }),
   setQuery: (q) => set({ query: q }),
@@ -194,6 +201,8 @@ export const useWhite = create<WhiteStore>((set, get) => ({
       focusedIndex: typeof i === "function" ? (i as (prev: number) => number)(s.focusedIndex) : i,
     })),
   setTimeRange: (r) => set({ timeRange: r }),
+  setFilterRegion: (r) => set({ filterRegion: r }),
+  setFilterLanguage: (l) => set({ filterLanguage: l }),
 
   resetToHome: () => set({ view: "home", query: "", suggestions: [], preview: null, focusedIndex: -1 }),
 }));

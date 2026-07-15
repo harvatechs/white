@@ -1,10 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Calculator, Ruler, Clock, BookOpen, CloudSun } from "lucide-react";
+import { Calculator, Ruler, Clock, BookOpen, CloudSun, DollarSign } from "lucide-react";
 
 export interface InstantAnswerData {
-  kind: "math" | "unit" | "time" | "definition" | "calc" | "weather";
+  kind: "math" | "unit" | "time" | "definition" | "calc" | "weather" | "currency";
   title: string;
   value: string;
   detail?: string;
@@ -17,6 +17,7 @@ const KIND_ICON = {
   time: Clock,
   definition: BookOpen,
   weather: CloudSun,
+  currency: DollarSign,
 };
 
 const KIND_LABEL = {
@@ -26,6 +27,7 @@ const KIND_LABEL = {
   time: "Current time",
   definition: "Definition",
   weather: "Weather",
+  currency: "Currency conversion",
 };
 
 export function InstantAnswerCard({ answer }: { answer: InstantAnswerData }) {

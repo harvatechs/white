@@ -31,13 +31,13 @@ const LANGUAGES = [
 
 export function FiltersButton() {
   const [open, setOpen] = useState(false);
-  const [region, setRegion] = useState("all");
-  const [language, setLanguage] = useState("all");
-  const prefs = useWhite((s) => s.prefs);
+  const region = useWhite((s) => s.filterRegion);
+  const language = useWhite((s) => s.filterLanguage);
+  const setRegion = useWhite((s) => s.setFilterRegion);
+  const setLanguage = useWhite((s) => s.setFilterLanguage);
+  const safeSearch = useWhite((s) => s.prefs.safeSearch);
   const setPrefs = useWhite((s) => s.setPrefs);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  const safeSearch = prefs.safeSearch;
 
   const toggleSafeSearch = () => {
     setPrefs({ safeSearch: !safeSearch });

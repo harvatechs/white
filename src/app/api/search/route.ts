@@ -21,6 +21,8 @@ export async function GET(req: NextRequest) {
   const recency = sp.get("r");
   const recencyDays = recency ? parseInt(recency, 10) : undefined;
   const algo = (sp.get("a") as SearchAlgorithm) || "relevance";
+  const region = sp.get("region") || "all";
+  const language = sp.get("lang") || "all";
 
   if (!q) return NextResponse.json({ error: "missing q" }, { status: 400 });
   if (!VALID.includes(category)) return NextResponse.json({ error: "bad category" }, { status: 400 });
@@ -29,10 +31,28 @@ export async function GET(req: NextRequest) {
     // Fire-and-forget seed check (non-blocking)
     ensureSeed().catch(() => {});
 
+    // Apply region/language filters by modifying the query
+    let searchQuery = q;
+    if (region !== "all") {
+      const regionSites: Record<string, string> = {
+        us: "", uk: " site:.uk", in: " site:.in", ca: " site:.ca",
+        au: " site:.au", de: " site:.de", fr: " site:.fr", jp: " site:.jp",
+      };
+      searchQuery = q + (regionSites[region] || "");
+    }
+    if (language !== "all") {
+      // Append language hint to help the search engine prioritize that language
+      const langNames: Record<string, string> = {
+        en: " English", es: " Spanish", fr: " French", de: " German",
+        ja: " Japanese", zh: " Chinese", hi: " Hindi",
+      };
+      searchQuery = searchQuery + (langNames[language] || "");
+    }
+
     // For page 1, only request what we need (faster SDK call).
     // For later pages, request page * num (capped at 30) for pagination.
     const fetchNum = page === 1 ? num : Math.min(page * num, 30);
-    const res = await runSearch(q, category, fetchNum, recencyDays && recencyDays > 0 ? recencyDays : undefined);
+    const res = await runSearch(searchQuery, category, fetchNum, recencyDays && recencyDays > 0 ? recencyDays : undefined);
 
     const sessionId = await getOrCreateSessionId();
 

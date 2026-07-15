@@ -103,6 +103,8 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
     }, [query, category]);
 
     const prefs = useWhite((s) => s.prefs);
+    const filterRegion = useWhite((s) => s.filterRegion);
+    const filterLanguage = useWhite((s) => s.filterLanguage);
 
     // Client-side result cache for instant back/forward navigation
     const cacheRef = useRef<Map<string, { results: SearchResultItem[]; meta: { tookMs: number; total: number; cached: boolean; hasMore?: boolean } | null }>>(new Map());
@@ -112,8 +114,8 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       const pageNum = p ?? 1;
       const range = r ?? timeRange;
       const algo = prefs.searchAlgorithm;
-      // Check client cache first
-      const cacheKey = `${q}|${c}|${range}|${algo}|${pageNum}`;
+      // Check client cache first (include filters in key)
+      const cacheKey = `${q}|${c}|${range}|${algo}|${pageNum}|${filterRegion}|${filterLanguage}`;
       const cached = cacheRef.current.get(cacheKey);
       if (cached) {
         setResults(cached.results);
@@ -130,8 +132,10 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       const days = range === "all" ? "" : `&r=${TIME_RANGE_DAYS[range]}`;
       const algoParam = `&a=${algo}`;
       const pageParam = `&p=${pageNum}&num=${pageSize}`;
+      const regionParam = filterRegion !== "all" ? `&region=${filterRegion}` : "";
+      const langParam = filterLanguage !== "all" ? `&lang=${filterLanguage}` : "";
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&c=${c}${pageParam}${days}${algoParam}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&c=${c}${pageParam}${days}${algoParam}${regionParam}${langParam}`);
         const data = (await res.json()) as SearchResponse & { error?: string; hasMore?: boolean };
         if (myReq === reqIdRef.current) {
           if (!res.ok && data.error) {
@@ -163,7 +167,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       } finally {
         if (myReq === reqIdRef.current) setLoading(false);
       }
-    }, [setFocusedIndex, timeRange, prefs.searchAlgorithm]);
+    }, [setFocusedIndex, timeRange, prefs.searchAlgorithm, filterRegion, filterLanguage]);
 
     useEffect(() => {
       setPage(1);
