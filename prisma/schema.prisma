@@ -77,3 +77,20 @@ model Preferences {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+
+// Bookmark — a result the user chose to save (Kagi-inspired "raise" signal)
+model Bookmark {
+  id        String   @id @default(cuid())
+  sessionId String
+  query     String
+  url       String
+  title     String
+  host      String
+  snippet   String  @default("")
+  category  String   @default("web")
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, url])
+  @@index([sessionId])
+  @@index([query])
+}

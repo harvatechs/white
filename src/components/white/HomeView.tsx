@@ -5,12 +5,17 @@ import { SearchBox, type SearchBoxHandle } from "./SearchBox";
 import { WhiteLogo } from "./WhiteLogo";
 import { HomeTagline, Footer } from "./Footer";
 import { HistoryPanel } from "./HistoryPanel";
+import { PopularSearches } from "./PopularSearches";
 import { useWhite } from "@/lib/store";
 import { useRef } from "react";
+import { Command } from "lucide-react";
 
 export function HomeView({ onSubmit }: { onSubmit: (q: string) => void }) {
   const history = useWhite((s) => s.history);
+  const popularQueries = useWhite((s) => s.popularQueries);
   const searchRef = useRef<SearchBoxHandle>(null);
+
+  const hasExtras = history.length > 0 || popularQueries.length > 0;
 
   return (
     <div className="ws-app">
@@ -38,14 +43,28 @@ export function HomeView({ onSubmit }: { onSubmit: (q: string) => void }) {
 
           <HomeTagline />
 
-          {history.length > 0 && (
+          {/* Keyboard hint */}
+          <div className="mt-5 flex items-center justify-center gap-2 text-[11px] text-foreground/35">
+            <Command className="size-3" strokeWidth={1.75} />
+            <span>
+              Press <kbd className="rounded border border-foreground/15 px-1.5 py-0.5 font-mono text-[10px]">/</kbd> to focus ·{" "}
+              <kbd className="rounded border border-foreground/15 px-1.5 py-0.5 font-mono text-[10px]">?</kbd> for shortcuts
+            </span>
+          </div>
+
+          {hasExtras && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4, duration: 0.4 }}
-              className="mt-10"
+              className="mt-10 flex flex-col gap-8"
             >
-              <HistoryPanel onPick={onSubmit} />
+              {history.length > 0 && (
+                <HistoryPanel onPick={onSubmit} centered />
+              )}
+              {popularQueries.length > 0 && (
+                <PopularSearches onPick={onSubmit} centered />
+              )}
             </motion.div>
           )}
         </motion.div>

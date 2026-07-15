@@ -14,7 +14,8 @@ import { ACCENTS, THEMES } from "@/lib/themes";
 import { applyTheme } from "@/lib/themes";
 import type { AccentName, Density, FontScale, WhiteTheme } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, RotateCcw } from "lucide-react";
+import { Trash2, RotateCcw, Download, Upload } from "lucide-react";
+import { useRef } from "react";
 
 export function SettingsSheet() {
   const open = useWhite((s) => s.showSettings);
@@ -22,12 +23,14 @@ export function SettingsSheet() {
   const prefs = useWhite((s) => s.prefs);
   const setPrefs = useWhite((s) => s.setPrefs);
   const setHistory = useWhite((s) => s.setHistory);
+  const setBookmarks = useWhite((s) => s.setBookmarks);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const save = (patch: Partial<typeof prefs>) => {
     const next = { ...prefs, ...patch };
     setPrefs(patch);
-    applyTheme(next.theme, next.accent);
+    applyTheme(next.theme, next.accent, next.density, next.fontScale);
     fetch("/api/preferences", {
       method: "PUT",
       headers: { "content-type": "application/json" },
@@ -39,6 +42,60 @@ export function SettingsSheet() {
     await fetch("/api/history", { method: "DELETE" }).catch(() => {});
     setHistory([]);
     toast({ title: "History cleared", description: "Your search history is gone." });
+  };
+
+  const exportData = async () => {
+    try {
+      const r = await fetch("/api/export");
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `white-search-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Data exported", description: "Your preferences, history, and bookmarks downloaded." });
+    } catch {
+      toast({ title: "Export failed", description: "Please try again.", variant: "destructive" });
+    }
+  };
+
+  const triggerImport = () => fileInputRef.current?.click();
+
+  const onImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const r = await fetch("/api/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const result = (await r.json()) as { ok: boolean; imported?: { preferences: boolean; history: number; bookmarks: number } };
+      if (result.ok && result.imported) {
+        toast({
+          title: "Data imported",
+          description: `Preferences${result.imported.preferences ? " ✓" : ""} · ${result.imported.history} history · ${result.imported.bookmarks} bookmarks`,
+        });
+        // reload everything
+        const [p, h, b] = await Promise.all([
+          fetch("/api/preferences").then((r) => r.json()),
+          fetch("/api/history?limit=20").then((r) => r.json()),
+          fetch("/api/bookmarks").then((r) => r.json()),
+        ]);
+        if (p.prefs) {
+          setPrefs(p.prefs);
+          applyTheme(p.prefs.theme, p.prefs.accent, p.prefs.density, p.prefs.fontScale);
+        }
+        if (h.history) setHistory(h.history);
+        if (b.bookmarks) setBookmarks(b.bookmarks);
+      }
+    } catch {
+      toast({ title: "Import failed", description: "Invalid file format.", variant: "destructive" });
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -201,15 +258,37 @@ export function SettingsSheet() {
           <section className="pt-5">
             <SectionLabel>Your data</SectionLabel>
             <p className="mt-1 text-[12px] text-foreground/50">
-              Your history and clicks live only in your anonymous session. Delete anytime.
+              Your history and bookmarks live only in your anonymous session. Export, import, or delete anytime.
             </p>
-            <div className="mt-3 flex flex-col gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={onImportFile}
+              className="hidden"
+              aria-hidden
+            />
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={exportData}
+                className="flex items-center justify-center gap-2 rounded-xl ws-hairline px-4 py-2.5 text-[13px] font-medium hover:ws-whisper transition-colors"
+              >
+                <Download className="size-4" /> Export
+              </button>
+              <button
+                type="button"
+                onClick={triggerImport}
+                className="flex items-center justify-center gap-2 rounded-xl ws-hairline px-4 py-2.5 text-[13px] font-medium hover:ws-whisper transition-colors"
+              >
+                <Upload className="size-4" /> Import
+              </button>
               <button
                 type="button"
                 onClick={clearHistory}
                 className="flex items-center justify-center gap-2 rounded-xl ws-hairline px-4 py-2.5 text-[13px] font-medium hover:ws-whisper transition-colors"
               >
-                <Trash2 className="size-4" /> Clear search history
+                <Trash2 className="size-4" /> Clear history
               </button>
               <button
                 type="button"
@@ -228,7 +307,7 @@ export function SettingsSheet() {
                 }
                 className="flex items-center justify-center gap-2 rounded-xl ws-hairline px-4 py-2.5 text-[13px] font-medium hover:ws-whisper transition-colors"
               >
-                <RotateCcw className="size-4" /> Reset to defaults
+                <RotateCcw className="size-4" /> Reset
               </button>
             </div>
           </section>

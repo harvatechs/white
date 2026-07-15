@@ -1,9 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ExternalLink, MoreHorizontal, ShieldCheck } from "lucide-react";
+import { Bookmark, BookmarkCheck, ShieldCheck } from "lucide-react";
 import { useWhite } from "@/lib/store";
-import type { SearchResultItem } from "@/lib/types";
+import type { BookmarkItem, SearchResultItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface ResultCardProps {
@@ -14,6 +14,9 @@ interface ResultCardProps {
 
 export function ResultCard({ item, index, query }: ResultCardProps) {
   const prefs = useWhite((s) => s.prefs);
+  const isBookmarked = useWhite((s) => s.bookmarkUrls.has(item.url));
+  const addBookmark = useWhite((s) => s.addBookmark);
+  const removeBookmark = useWhite((s) => s.removeBookmark);
 
   const onClick = () => {
     // learn — fire and forget
@@ -31,6 +34,32 @@ export function ResultCard({ item, index, query }: ResultCardProps) {
     }).catch(() => {});
   };
 
+  const toggleBookmark = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isBookmarked) {
+      removeBookmark(item.url);
+      fetch(`/api/bookmarks?url=${encodeURIComponent(item.url)}`, { method: "DELETE" }).catch(() => {});
+    } else {
+      const bm: BookmarkItem = {
+        id: `tmp_${Date.now()}`,
+        query,
+        url: item.url,
+        title: item.name,
+        host: item.cleanHost,
+        snippet: item.snippet,
+        category: item.category,
+        createdAt: new Date().toISOString(),
+      };
+      addBookmark(bm);
+      fetch("/api/bookmarks", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(bm),
+      }).catch(() => {});
+    }
+  };
+
   const target = prefs.openNewTab ? "_blank" : "_self";
   const rel = prefs.openNewTab ? "noopener noreferrer" : undefined;
 
@@ -39,7 +68,7 @@ export function ResultCard({ item, index, query }: ResultCardProps) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.32, delay: Math.min(index * 0.03, 0.25), ease: [0.22, 1, 0.36, 1] }}
-      className="ws-result px-4 py-4 md:px-5"
+      className="ws-result group relative px-4 py-4 md:px-5"
     >
       <div className="flex items-start gap-3">
         {/* favicon or letterbox */}
@@ -93,11 +122,22 @@ export function ResultCard({ item, index, query }: ResultCardProps) {
 
         <button
           type="button"
-          className="ml-1 hidden shrink-0 rounded-full p-1.5 text-foreground/30 hover:bg-foreground/5 hover:text-foreground/60 md:inline-flex"
-          aria-label="More"
-          onClick={(e) => e.preventDefault()}
+          onClick={toggleBookmark}
+          className={cn(
+            "ml-1 shrink-0 rounded-full p-1.5 transition-all",
+            isBookmarked
+              ? "text-foreground/70 opacity-100"
+              : "text-foreground/30 opacity-0 hover:bg-foreground/5 hover:text-foreground/60 group-hover:opacity-100 group-focus-within:opacity-100"
+          )}
+          aria-label={isBookmarked ? "Remove bookmark" : "Save bookmark"}
+          aria-pressed={isBookmarked}
+          title={isBookmarked ? "Remove bookmark" : "Save bookmark"}
         >
-          <MoreHorizontal className="size-4" />
+          {isBookmarked ? (
+            <BookmarkCheck className="size-4" style={{ color: "var(--ws-accent)" }} strokeWidth={1.75} />
+          ) : (
+            <Bookmark className="size-4" strokeWidth={1.75} />
+          )}
         </button>
       </div>
     </motion.div>

@@ -10,9 +10,10 @@ interface HistoryPanelProps {
   onPick: (q: string) => void;
   className?: string;
   compact?: boolean;
+  centered?: boolean;
 }
 
-export function HistoryPanel({ onPick, className, compact }: HistoryPanelProps) {
+export function HistoryPanel({ onPick, className, compact, centered }: HistoryPanelProps) {
   const history = useWhite((s) => s.history);
 
   if (history.length === 0) return null;
@@ -21,13 +22,13 @@ export function HistoryPanel({ onPick, className, compact }: HistoryPanelProps) 
 
   return (
     <div className={cn("w-full", className)}>
-      <div className="mb-3 flex items-center gap-2">
+      <div className={cn("mb-3 flex items-center gap-2", centered && "justify-center")}>
         <Clock className="size-3.5 text-foreground/40" strokeWidth={1.75} />
         <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-foreground/40">
           Recent searches
         </h3>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className={cn("flex flex-wrap gap-2", centered && "justify-center")}>
         <AnimatePresence>
           {items.map((h) => (
             <motion.button

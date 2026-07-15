@@ -1,12 +1,16 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useWhite } from "@/lib/store";
 import { Boot } from "@/components/white/Boot";
 import { HomeView } from "@/components/white/HomeView";
-import { ResultsView } from "@/components/white/ResultsView";
+import { ResultsView, type ResultsViewHandle } from "@/components/white/ResultsView";
 import { AboutDialog } from "@/components/white/AboutDialog";
 import { SettingsSheet } from "@/components/white/SettingsSheet";
+import { ShortcutsHelp } from "@/components/white/ShortcutsHelp";
+import { MarkovInspector } from "@/components/white/MarkovInspector";
+import { BookmarksDialog } from "@/components/white/BookmarksDialog";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { SearchCategory } from "@/lib/types";
 
 const VALID_CATS: SearchCategory[] = ["web", "news", "images", "videos"];
@@ -18,6 +22,8 @@ export default function Page() {
   const setQuery = useWhite((s) => s.setQuery);
   const category = useWhite((s) => s.category);
   const setCategory = useWhite((s) => s.setCategory);
+
+  const resultsRef = useRef<ResultsViewHandle>(null);
 
   // sync from URL on mount (and on back/forward)
   useEffect(() => {
@@ -88,11 +94,18 @@ export default function Page() {
     [setCategory, pushUrl, query]
   );
 
+  // keyboard shortcuts
+  useKeyboardShortcuts({
+    onHome: handleBack,
+    onFocusSearch: () => resultsRef.current?.focusSearch(),
+  });
+
   return (
     <>
       <Boot />
       {view === "results" && query.trim() ? (
         <ResultsView
+          ref={resultsRef}
           query={query}
           category={category}
           onBack={handleBack}
@@ -104,6 +117,9 @@ export default function Page() {
       )}
       <AboutDialog />
       <SettingsSheet />
+      <ShortcutsHelp />
+      <MarkovInspector />
+      <BookmarksDialog onPick={handleSubmit} />
     </>
   );
 }

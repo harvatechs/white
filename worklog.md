@@ -54,3 +54,72 @@ Unresolved / Next-phase priorities:
 - Could add export/import of preferences + history (data portability).
 - Could add a "Markov inspector" view to let users see and reset the trained chain (transparency).
 - Could add PWA / offline shell support.
+
+---
+Task ID: 2
+Agent: webDevReview cron (round 1)
+Task: QA the current WHITE Search build via agent-browser, fix bugs, then add new features (keyboard shortcuts, Markov Inspector, popular searches, bookmarks, data export/import) and polish styling.
+
+Work Log:
+- Reviewed worklog.md from Task ID 1 — project was stable (lint clean, all core flows verified).
+- Performed QA with agent-browser (1440x900 viewport):
+  - Home view, search flow, category tabs, About dialog, Settings sheet all functional.
+  - No console errors, no runtime errors.
+  - Captured screenshots of home + results for VLM analysis.
+- Used VLM (z-ai vision) to critically evaluate home + results page styling. Key findings:
+  - RECENT SEARCHES heading was left-aligned while chips were centered (alignment tension).
+  - Result card spacing was mostly good but could be more consistent.
+  - Footer alignment could be cleaner.
+  - Overall minimalism praised; specific CSS-level improvements suggested.
+- Added Bookmark model to Prisma schema (sessionId + url unique) and pushed to DB.
+- Built 4 new API routes:
+  - `/api/bookmarks` (GET list, POST add, DELETE one/all) — Kagi-inspired save feature.
+  - `/api/markov` (GET stats + top tokens/edges + token transitions; DELETE reset) — transparency inspector.
+  - `/api/popular` (GET top queries + top clicked hosts) — "of the people" feed from anonymous usage.
+  - `/api/export` + `/api/import` (GET downloads JSON; POST merges) — full data portability.
+- Expanded Zustand store with: bookmarks, bookmarkUrls Set, popularQueries, popularHosts, and 3 new dialog toggles (showShortcuts, showMarkov, showBookmarks). Added addBookmark/removeBookmark/isBookmarked helpers.
+- Expanded types.ts with BookmarkItem, PopularQuery, PopularHost, MarkovStats, MarkovInspectorData.
+- Updated Boot component to hydrate bookmarks + popular searches in parallel with history.
+- Built 5 new UI components:
+  - `ShortcutsHelp.tsx` — dialog listing all keyboard shortcuts with kbd styling.
+  - `MarkovInspector.tsx` — full transparency dialog: 3 stat cards, token inspector input, top starts/tokens/transitions with bar visualizations, reset button.
+  - `BookmarksDialog.tsx` — saved results with re-search, open, remove actions; empty state.
+  - `PopularSearches.tsx` — "Popular right now" chips + "Most-visited sources" for home view.
+  - `use-keyboard-shortcuts.ts` hook — `/` focus, `Esc` home, `?` help, `g then h/s/a/b/m` vim-style prefixes.
+- Updated ResultCard: replaced "More" button with a bookmark toggle (Bookmark/BookmarkCheck icons, opacity-0 → group-hover:opacity-100, aria-pressed state).
+- Updated Footer: cleaner 3-section layout (brand / nav / philosophy), added Bookmarks (with badge), Markov, Shortcuts footer buttons.
+- Updated HomeView: centered HistoryPanel + PopularSearches, added keyboard hint line ("Press / to focus · ? for shortcuts").
+- Updated ResultsView: converted to forwardRef with focusSearch method (for `/` shortcut), added bookmarks button in header (with count badge), shortcuts button.
+- Updated SettingsSheet: added Export/Import/Clear/Reset 2x2 grid in "Your data" section, with hidden file input for import.
+- Updated page.tsx: wired keyboard shortcuts hook, added all 5 dialogs (About, Settings, Shortcuts, Markov, Bookmarks), ref forwarding for results view.
+- Updated HistoryPanel: added `centered` prop to fix the VLM-identified alignment issue.
+- Updated globals.css: added kbd styling, focus-visible outlines, density data-attr scaling, dialog shadow polish, bookmark pop animation, reduced-motion media query, hero glow utility.
+- Updated themes.ts: applyTheme now accepts density + fontScale params, sets data-density/data-fontScale attrs, computes --ws-accent-rgb for rgba use.
+- Fixed a stale Prisma client cache issue: the dev server's global PrismaClient singleton was created before the Bookmark model was added, so `db.bookmark` was undefined in some routes. Fixed by introducing a schema-version-keyed global cache in db.ts (`__wsPrisma` with `SCHEMA_VERSION`), then forcing a dev server restart via `touch next.config.ts` to fully invalidate Turbopack's module cache.
+- Verified all features end-to-end via agent-browser:
+  - Home shows centered recent searches + popular searches + most-visited sources.
+  - Search returns 10 results, bookmark button toggles correctly (Save → Remove).
+  - Bookmarks dialog shows saved bookmark with re-search/open/remove.
+  - Markov Inspector shows 65 tokens, 46 edges, top starts/tokens/transitions with bar viz.
+  - Keyboard `?` opens shortcuts help dialog.
+  - Export API returns full JSON (preferences + history + bookmarks + markovStats).
+  - No console errors throughout.
+- VLM re-evaluation confirmed: alignment issues fixed, layout clean and cohesive, bookmark icon well-placed, no remaining visual issues.
+- Ran `bun run lint` — clean (0 errors, 0 warnings).
+
+Stage Summary:
+- WHITE Search now has 5 major new features: keyboard shortcuts, Markov Inspector (transparency), popular searches feed, result bookmarking, and full data export/import.
+- 4 new API routes, 5 new UI components, 1 new hook, 1 new Prisma model.
+- Styling polished: centered alignment, kbd styling, focus-visible, density scaling, reduced-motion support, dialog shadows.
+- All features browser-verified, VLM-confirmed visual improvements, lint clean.
+- Dev server healthy on port 3000.
+
+Unresolved / Next-phase priorities:
+- `j`/`k` result navigation (reserved in shortcuts hook, not yet wired to scroll results).
+- Image/video search is URL-heuristic; could integrate a dedicated media source.
+- PWA / offline shell support.
+- Full-screen reading mode for result previews.
+- "Raise/lower" ranking controls (Kagi-inspired) beyond bookmarks.
+- Theme could persist a custom accent color picker (beyond the 5 presets).
+- Markov Inspector could show a visual graph of the top transitions.
+- Mobile-specific refinements (bottom sheet for settings on small screens).

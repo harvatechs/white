@@ -116,8 +116,13 @@ export const FONT_SCALE_CLASS: Record<FontScale, string> = {
   large: "text-[17px]",
 };
 
-// Apply a theme + accent to :root as CSS custom properties.
-export function applyTheme(theme: WhiteTheme, accent: AccentName) {
+// Apply a theme + accent + density to :root as CSS custom properties + data attrs.
+export function applyTheme(
+  theme: WhiteTheme,
+  accent: AccentName,
+  density?: Density,
+  fontScale?: FontScale
+) {
   if (typeof document === "undefined") return;
   const t = THEME_MAP[theme];
   const a = ACCENT_MAP[accent];
@@ -127,6 +132,17 @@ export function applyTheme(theme: WhiteTheme, accent: AccentName) {
   root.style.setProperty("--ws-whisper", t.whisper);
   root.style.setProperty("--ws-accent", a.color);
   root.style.setProperty("--ws-accent-soft", a.soft);
+  root.style.setProperty("--ws-accent-rgb", hexToRgb(a.color));
   root.dataset.wsTheme = theme;
   root.dataset.wsAccent = accent;
+  if (density) root.dataset.density = density;
+  if (fontScale) root.dataset.fontScale = fontScale;
+}
+
+function hexToRgb(hex: string): string {
+  const m = hex.replace("#", "");
+  const r = parseInt(m.slice(0, 2), 16);
+  const g = parseInt(m.slice(2, 4), 16);
+  const b = parseInt(m.slice(4, 6), 16);
+  return `${r}, ${g}, ${b}`;
 }

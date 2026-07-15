@@ -68,6 +68,42 @@ export interface HistoryItem {
   category: SearchCategory;
   resultsCount: number;
   createdAt: string;
+  clicked?: boolean;
+}
+
+export interface BookmarkItem {
+  id: string;
+  query: string;
+  url: string;
+  title: string;
+  host: string;
+  snippet: string;
+  category: SearchCategory;
+  createdAt: string;
+}
+
+export interface PopularQuery {
+  query: string;
+  count: number;
+}
+
+export interface PopularHost {
+  host: string;
+  count: number;
+}
+
+export interface MarkovStats {
+  nodes: number;
+  edges: number;
+  totalFrequency: number;
+}
+
+export interface MarkovInspectorData {
+  stats: MarkovStats;
+  topStarts: { token: string; startCount: number; frequency: number }[];
+  topTokens: { token: string; frequency: number; startCount: number }[];
+  topEdges: { fromToken: string; toToken: string; weight: number }[];
+  tokenTransitions: { toToken: string; weight: number }[];
 }
 
 export type ViewState = "home" | "results";
