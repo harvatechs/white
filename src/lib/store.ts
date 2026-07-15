@@ -61,6 +61,7 @@ interface WhiteStore {
   showDomainRules: boolean;
   showStats: boolean;
   showCommand: boolean;
+  showHistory: boolean;
   // Reading Mode
   preview: { item: SearchResultItem; data: PreviewData | null; loading: boolean; error: string | null } | null;
   // j/k navigation
@@ -89,6 +90,7 @@ interface WhiteStore {
   setShowDomainRules: (b: boolean) => void;
   setShowStats: (b: boolean) => void;
   setShowCommand: (b: boolean) => void;
+  setShowHistory: (b: boolean) => void;
   setDomainRules: (r: DomainRule[]) => void;
   setDomainRule: (host: string, action: DomainAction) => void;
   removeDomainRule: (host: string) => void;
@@ -122,6 +124,7 @@ export const useWhite = create<WhiteStore>((set, get) => ({
   showDomainRules: false,
   showStats: false,
   showCommand: false,
+  showHistory: false,
   preview: null,
   focusedIndex: -1,
   timeRange: "all" as TimeRange,
@@ -160,6 +163,7 @@ export const useWhite = create<WhiteStore>((set, get) => ({
   setShowDomainRules: (b) => set({ showDomainRules: b }),
   setShowStats: (b) => set({ showStats: b }),
   setShowCommand: (b) => set({ showCommand: b }),
+  setShowHistory: (b) => set({ showHistory: b }),
   setDomainRules: (r) =>
     set({
       domainRules: r,

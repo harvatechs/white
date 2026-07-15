@@ -11,7 +11,8 @@ interface ShortcutHandlers {
 // Global keyboard shortcuts for WHITE Search.
 //   /            focus the search field
 //   Esc          go home (from results) or close overlays
-//   g then h     go home
+//   g then o     go home
+//   g then h     open search history
 //   g then s     open settings
 //   g then a     open about
 //   g then b     open bookmarks
@@ -32,6 +33,7 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
   const setShowDomainRules = useWhite((s) => s.setShowDomainRules);
   const setShowStats = useWhite((s) => s.setShowStats);
   const setShowCommand = useWhite((s) => s.setShowCommand);
+  const setShowHistory = useWhite((s) => s.setShowHistory);
   const view = useWhite((s) => s.view);
 
   useEffect(() => {
@@ -73,6 +75,7 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
           useWhite.getState().showDomainRules ||
           useWhite.getState().showStats ||
           useWhite.getState().showCommand ||
+          useWhite.getState().showHistory ||
           !!useWhite.getState().preview;
 
         if (anyOpen) return; // let the dialog/sheet/pane handle it
@@ -102,9 +105,12 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
 
       if (gPressed) {
         const key = e.key.toLowerCase();
-        if (key === "h") {
+        if (key === "o") {
           e.preventDefault();
           handlers.onHome();
+        } else if (key === "h") {
+          e.preventDefault();
+          setShowHistory(true);
         } else if (key === "s") {
           e.preventDefault();
           setShowSettings(true);
@@ -146,5 +152,5 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       window.removeEventListener("keydown", onKey);
       if (gTimer) clearTimeout(gTimer);
     };
-  }, [view, handlers, setShowSettings, setShowAbout, setShowShortcuts, setShowMarkov, setShowBookmarks, setShowDomainRules, setShowStats, setShowCommand]);
+  }, [view, handlers, setShowSettings, setShowAbout, setShowShortcuts, setShowMarkov, setShowBookmarks, setShowDomainRules, setShowStats, setShowCommand, setShowHistory]);
 }

@@ -18,6 +18,8 @@ const SHORTCUTS: { keys: string[]; label: string; group: string }[] = [
   { keys: ["k"], label: "Previous result", group: "Results" },
   { keys: ["Enter"], label: "Read focused result (preview)", group: "Results" },
   { keys: ["o"], label: "Open focused result in new tab", group: "Results" },
+  { keys: ["n"], label: "Next page of results", group: "Results" },
+  { keys: ["p"], label: "Previous page of results", group: "Results" },
   { keys: ["g", "h"], label: "Go home", group: "Navigation" },
   { keys: ["g", "s"], label: "Open Customize", group: "Navigation" },
   { keys: ["g", "a"], label: "Open About", group: "Navigation" },
@@ -25,6 +27,8 @@ const SHORTCUTS: { keys: string[]; label: string; group: string }[] = [
   { keys: ["g", "m"], label: "Open Markov Inspector", group: "Navigation" },
   { keys: ["g", "d"], label: "Open Domain ranking", group: "Navigation" },
   { keys: ["g", "t"], label: "Open Search stats", group: "Navigation" },
+  { keys: ["g", "h"], label: "Open Search history", group: "Navigation" },
+  { keys: ["g", "o"], label: "Go home", group: "Navigation" },
   { keys: ["s"], label: "Summarize current page (in Reading Mode)", group: "Results" },
 ];
 

@@ -173,7 +173,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       };
     }, [loading]);
 
-    // j/k navigation through results (only when reading pane is closed)
+    // j/k navigation + pagination shortcuts (only when reading pane is closed)
     useEffect(() => {
       const onKey = (e: KeyboardEvent) => {
         if (preview) return; // reading pane handles its own nav
@@ -195,11 +195,25 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
           // 'o' opens the original page
           e.preventDefault();
           window.open(results[focusedIndex].url, "_blank", "noopener");
+        } else if (e.key === "n" && meta?.hasMore) {
+          // 'n' = next page
+          e.preventDefault();
+          const next = page + 1;
+          setPage(next);
+          runSearch(query, category, undefined, next);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } else if (e.key === "p" && page > 1) {
+          // 'p' = previous page
+          e.preventDefault();
+          const prev = page - 1;
+          setPage(prev);
+          runSearch(query, category, undefined, prev);
+          window.scrollTo({ top: 0, behavior: "smooth" });
         }
       };
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
-    }, [preview, loading, results, focusedIndex, setFocusedIndex, setPreview]);
+    }, [preview, loading, results, focusedIndex, setFocusedIndex, setPreview, meta, page, query, category, runSearch]);
 
     const handleSubmit = (q: string) => onNewQuery(q);
     const handleTabChange = (c: SearchCategory) => onCategoryChange(c);
@@ -381,7 +395,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
 
           {/* Related searches */}
           {!loading && category !== "images" && related.length > 0 && (
-            <RelatedSearches items={related} onPick={handleNewQuery} />
+            <RelatedSearches items={related} onPick={handleSubmit} />
           )}
         </main>
 

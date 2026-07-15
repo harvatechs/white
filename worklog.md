@@ -540,3 +540,49 @@ Unresolved / Next-phase priorities:
 - Dark themes could have dedicated dark-mode accent presets.
 - Pagination could support "load more" infinite scroll as an alternative.
 - Could add keyboard shortcuts for pagination (left/right arrows when not in input).
+
+---
+Task ID: 10
+Agent: webDevReview cron (round 8)
+Task: QA the current build, fix the RelatedSearches crash bug, then add search history timeline view and pagination keyboard shortcuts.
+
+Work Log:
+- Reviewed worklog.md from Tasks 1-9 — project stable with pagination, share button, dark themes.
+- Performed QA with agent-browser (1440x900):
+  - Found a critical client-side crash ("Application error: handleNewQuery is not defined") on the results page.
+  - Root cause: RelatedSearches component's `onPick` prop was set to `handleNewQuery` which doesn't exist — the function is named `handleSubmit` (which calls `onNewQuery` internally).
+  - This crash happened whenever related searches rendered (queries with Markov data).
+- FIXED the crash: Changed `<RelatedSearches items={related} onPick={handleNewQuery} />` to `onPick={handleSubmit}`.
+- Built search history timeline view:
+  - New `HistoryTimeline.tsx` component: full-screen dialog with searchable filter, day-grouped timeline (Today, Yesterday, weekday labels), individual item delete (hover X), clear all button, "visited" badge for clicked searches, time stamps, loading skeletons, empty states for no history and no filter matches.
+  - Added `showHistory` + `setShowHistory` to Zustand store.
+  - Added to Footer menu as "Search history" option.
+  - Added `g then h` keyboard shortcut (changed "go home" from `g then h` to `g then o`).
+  - Updated ShortcutsHelp with new shortcuts.
+  - Wired into page.tsx.
+  - VLM-confirmed: "Timeline design is clean with clear day grouping. Filter search box is usable."
+- Added pagination keyboard shortcuts:
+  - `n` = next page (only when `hasMore` is true).
+  - `p` = previous page (only when page > 1).
+  - Smooth scroll to top on page change.
+  - Updated ShortcutsHelp with n/p entries.
+  - Updated ResultsView keyboard handler with pagination support.
+- Verified all features end-to-end via agent-browser:
+  - Results page: 10 results, no crash (bug fixed), algorithm badge "relevance", share button present.
+  - History timeline: opens from footer menu, shows "Today" grouping, filter works (1 match for "react").
+  - No console errors.
+  - Lint clean (0 errors, 0 warnings).
+
+Stage Summary:
+- WHITE Search now has 2 major new features: search history timeline + pagination keyboard shortcuts.
+- 1 critical bug fixed (RelatedSearches crash from undefined handleNewQuery).
+- 1 new UI component (HistoryTimeline), 1 new store field, 2 new keyboard shortcuts.
+- Lint clean, VLM-confirmed history timeline quality.
+- Dev server healthy on port 3000.
+
+Unresolved / Next-phase priorities:
+- Safe search toggle in header (pending).
+- Result count estimator + search time more prominently displayed.
+- History timeline could show search frequency chart.
+- Could add "recently visited" from click tracking separate from search history.
+- Dark themes could have dedicated dark-mode accent presets.

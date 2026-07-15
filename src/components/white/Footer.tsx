@@ -14,6 +14,7 @@ import {
   Keyboard,
   Github,
   X,
+  History,
 } from "lucide-react";
 
 export function Footer() {
@@ -25,6 +26,7 @@ export function Footer() {
   const setShowDomainRules = useWhite((s) => s.setShowDomainRules);
   const setShowStats = useWhite((s) => s.setShowStats);
   const setShowCommand = useWhite((s) => s.setShowCommand);
+  const setShowHistory = useWhite((s) => s.setShowHistory);
   const bookmarkCount = useWhite((s) => s.bookmarks.length);
   const domainRuleCount = useWhite((s) => s.domainRules.length);
 
@@ -43,6 +45,7 @@ export function Footer() {
   const items = [
     { label: "Customize", icon: Settings, action: () => setShowSettings(true) },
     { label: "Bookmarks", icon: Bookmark, action: () => setShowBookmarks(true), badge: bookmarkCount },
+    { label: "Search history", icon: History, action: () => setShowHistory(true) },
     { label: "Domain ranking", icon: Sliders, action: () => setShowDomainRules(true), badge: domainRuleCount },
     { label: "Search stats", icon: BarChart3, action: () => setShowStats(true) },
     { label: "Markov Inspector", icon: Network, action: () => setShowMarkov(true) },
