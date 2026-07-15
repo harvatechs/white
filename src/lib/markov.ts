@@ -80,6 +80,8 @@ async function upsertEdge(from: string, to: string) {
 
 // Generate suggestions for a partial query.
 // Returns up to `limit` suggestions, scored 0..1.
+// Advanced autofill: combines prefix matching, substring matching, Markov
+// token completion, bigram prediction, and personal history.
 export async function suggest(
   partial: string,
   limit: number,
@@ -91,23 +93,24 @@ export async function suggest(
   const tokens = tokenize(trimmed);
   const lastToken = tokens[tokens.length - 1] ?? "";
   const prefix = trimmed;
+  const lowerPrefix = prefix.toLowerCase();
 
   const out: Map<string, { text: string; score: number; source: "markov" | "history" | "popular" }> = new Map();
 
-  // 1) Personal history first — strongest signal for the individual
+  // 1) Personal history — strongest signal. Match prefix OR substring.
   for (const h of historyHints) {
-    if (h.toLowerCase().startsWith(prefix.toLowerCase()) && h.toLowerCase() !== trimmed.toLowerCase()) {
-      const existing = out.get(h);
-      const score = 0.95;
-      if (!existing || existing.score < score) {
-        out.set(h, { text: h, score, source: "history" });
-      }
+    const lh = h.toLowerCase();
+    if (lh === trimmed.toLowerCase()) continue;
+    if (lh.startsWith(lowerPrefix)) {
+      out.set(h, { text: h, score: 0.95, source: "history" });
+    } else if (lh.includes(lowerPrefix)) {
+      out.set(h, { text: h, score: 0.7, source: "history" });
     }
   }
 
-  // 2) Markov: complete the current token, then optionally predict the next token
+  // 2) Markov: complete the current token, then predict the next token(s)
   if (lastToken) {
-    // nodes that start with the last token (autocomplete the current word)
+    // Token completion: nodes that start with the last token
     const tokenMatches = await db.markovNode.findMany({
       where: { token: { startsWith: lastToken } },
       orderBy: { frequency: "desc" },
@@ -124,7 +127,7 @@ export async function suggest(
       }
     }
 
-    // predict next token from the last complete token
+    // Bigram prediction: predict next token from the last complete token
     const edges = await db.markovEdge.findMany({
       where: { fromToken: lastToken },
       orderBy: { weight: "desc" },
@@ -138,6 +141,25 @@ export async function suggest(
       const existing = out.get(completed);
       if (!existing || existing.score < score) {
         out.set(completed, { text: completed, score, source: "markov" });
+      }
+    }
+
+    // Advanced: 2-token lookahead — if the last token has a strong edge,
+    // also predict the token AFTER that (trigram-style)
+    if (edges.length > 0 && tokens.length >= 1) {
+      const topEdge = edges[0];
+      const nextEdges = await db.markovEdge.findMany({
+        where: { fromToken: topEdge.toToken },
+        orderBy: { weight: "desc" },
+        take: 3,
+      });
+      for (const ne of nextEdges) {
+        const completed = [...tokens, topEdge.toToken, ne.toToken].join(" ");
+        const score = Math.min(0.65, 0.15 + (ne.weight / (topEdge.weight + ne.weight)) * 0.3);
+        const existing = out.get(completed);
+        if (!existing || existing.score < score) {
+          out.set(completed, { text: completed, score, source: "markov" });
+        }
       }
     }
   }

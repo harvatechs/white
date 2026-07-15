@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, ArrowRight, Sparkles, Clock, TrendingUp } from "lucide-react";
+import { Search, X, ArrowRight, Sparkles, Clock, TrendingUp, CornerDownLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWhite } from "@/lib/store";
 import type { SuggestionItem } from "@/lib/types";
@@ -51,6 +51,7 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
 
     const [open, setOpen] = useState(false);
     const [active, setActive] = useState(-1);
+    const [focused, setFocused] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const boxRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,6 +67,7 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
       function onDoc(e: MouseEvent) {
         if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
           setOpen(false);
+          setFocused(false);
         }
       }
       document.addEventListener("mousedown", onDoc);
@@ -108,13 +110,15 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
         return;
       }
       setOpen(true);
-      debounceRef.current = setTimeout(() => fetchSuggestions(v), 90);
+      // faster debounce for snappier autofill
+      debounceRef.current = setTimeout(() => fetchSuggestions(v), 60);
     };
 
     const submit = (q: string) => {
       const trimmed = q.trim();
       if (!trimmed) return;
       setOpen(false);
+      setFocused(false);
       inputRef.current?.blur();
       onSubmit?.(trimmed);
     };
@@ -137,23 +141,39 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
       } else if (e.key === "Escape") {
         setOpen(false);
         setActive(-1);
+        inputRef.current?.blur();
+      } else if (e.key === "Tab" && active >= 0 && suggestions[active]) {
+        // Tab autocompletes the selected suggestion into the input
+        e.preventDefault();
+        setValue(suggestions[active].text);
+        setActive(-1);
       }
     };
 
     const isLg = size === "lg";
     const visible = open && (suggestions.length > 0 || (loading && value.trim()));
+    const hasValue = value.trim().length > 0;
 
     return (
       <div ref={boxRef} className={cn("relative w-full", className)}>
-        <div
+        <motion.div
+          animate={{
+            boxShadow: focused
+              ? isLg
+                ? "0 2px 8px rgba(0,0,0,0.04), 0 12px 48px rgba(0,0,0,0.08)"
+                : "0 1px 4px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06)"
+              : "0 1px 2px rgba(0,0,0,0.03)",
+          }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           className={cn(
-            "ws-searchfield ws-ring flex items-center gap-3 rounded-2xl",
-            isLg ? "px-6 py-4 md:py-5" : "px-4 py-3"
+            "ws-searchfield-luxury flex items-center gap-2 sm:gap-3 rounded-2xl transition-colors",
+            isLg ? "px-4 py-3.5 sm:px-6 sm:py-5" : "px-3.5 py-2.5 sm:px-4 sm:py-3"
           )}
+          data-focused={focused}
         >
           <Search
-            className={cn("shrink-0", isLg ? "size-5" : "size-4")}
-            style={{ color: "var(--ws-accent)" }}
+            className={cn("shrink-0 transition-colors", isLg ? "size-5" : "size-4")}
+            style={{ color: focused ? "var(--ws-accent)" : "color-mix(in srgb, var(--foreground) 35%, transparent)" }}
             strokeWidth={1.75}
           />
           <input
@@ -161,15 +181,18 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
             value={value}
             onChange={(e) => handleChange(e.target.value)}
             onKeyDown={onKey}
-            onFocus={() => value.trim() && setOpen(true)}
+            onFocus={() => {
+              setFocused(true);
+              if (value.trim()) setOpen(true);
+            }}
             autoFocus={autoFocus}
             type="text"
             autoComplete="off"
             spellCheck={false}
-            placeholder={isLg ? "Search the open web — no ads, no sponsors" : "Search WHITE"}
+            placeholder={isLg ? "Search the open web" : "Search"}
             className={cn(
-              "flex-1 bg-transparent outline-none placeholder:text-foreground/35",
-              isLg ? "text-lg md:text-xl" : "text-base"
+              "flex-1 bg-transparent outline-none placeholder:text-foreground/30 transition-colors",
+              isLg ? "text-base sm:text-lg md:text-xl" : "text-sm sm:text-base"
             )}
             aria-label="Search query"
             role="combobox"
@@ -177,7 +200,7 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
             aria-controls="ws-suggest-list"
             aria-autocomplete="list"
           />
-          {value && (
+          {hasValue && (
             <button
               type="button"
               onClick={() => {
@@ -185,10 +208,10 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
                 setSuggestions([]);
                 inputRef.current?.focus();
               }}
-              className="rounded-full p-1 text-foreground/40 hover:text-foreground transition-colors"
+              className="shrink-0 rounded-full p-1 text-foreground/30 hover:text-foreground/60 transition-colors"
               aria-label="Clear search"
             >
-              <X className="size-4" />
+              <X className="size-4" strokeWidth={1.75} />
             </button>
           )}
           <VoiceSearchButton
@@ -198,40 +221,42 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
             }}
             size={isLg ? "md" : "sm"}
           />
-          {value.trim() && (
+          {hasValue && (
             <button
               type="button"
               onClick={() => submit(value)}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition-all",
-                isLg ? "text-sm" : "text-xs"
+                "flex shrink-0 items-center justify-center rounded-xl transition-all active:scale-95",
+                isLg ? "size-10" : "size-8"
               )}
               style={{ background: "var(--ws-accent)", color: "#fff" }}
               aria-label="Search"
             >
-              <span className="hidden sm:inline">Search</span>
-              <ArrowRight className="size-3.5" />
+              <ArrowRight className={isLg ? "size-4" : "size-3.5"} strokeWidth={2} />
             </button>
           )}
-        </div>
+        </motion.div>
 
         <AnimatePresence>
           {visible && (
             <motion.div
               id="ws-suggest-list"
-              initial={{ opacity: 0, y: -4, scale: 0.99 }}
+              initial={{ opacity: 0, y: -6, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.99 }}
-              transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
-              className="ws-surface ws-hairline absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl shadow-xl"
+              exit={{ opacity: 0, y: -6, scale: 0.98 }}
+              transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+              className="ws-surface absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-foreground/8 backdrop-blur-xl"
               style={{
-                boxShadow:
-                  "0 1px 2px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.06)",
+                background: "color-mix(in srgb, var(--ws-surface) 92%, transparent)",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)",
               }}
               role="listbox"
             >
               {loading && suggestions.length === 0 && (
-                <div className="px-4 py-3 text-sm text-foreground/50">Thinking…</div>
+                <div className="flex items-center gap-2.5 px-4 py-3 text-[13px] text-foreground/45">
+                  <Sparkles className="size-3.5 animate-pulse" style={{ color: "var(--ws-accent)" }} strokeWidth={1.75} />
+                  Thinking…
+                </div>
               )}
               {suggestions.map((sug, i) => {
                 const Icon = SOURCE_ICON[sug.source] ?? Sparkles;
@@ -241,7 +266,7 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
                     role="option"
                     aria-selected={i === active}
                     data-active={i === active}
-                    className="ws-suggestion"
+                    className="ws-suggestion-luxury"
                     onMouseEnter={() => setActive(i)}
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -249,16 +274,16 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
                     }}
                   >
                     <Icon
-                      className="size-4 shrink-0"
-                      style={{ color: "var(--ws-accent)", opacity: 0.65 }}
+                      className="size-4 shrink-0 transition-colors"
+                      style={{ color: i === active ? "var(--ws-accent)" : "color-mix(in srgb, var(--foreground) 35%, transparent)" }}
                       strokeWidth={1.75}
                     />
-                    <span className="ws-sug-text flex-1 truncate">
+                    <span className="flex-1 truncate text-[14px] sm:text-[15px]">
                       {highlight(sug.text, value)}
                     </span>
-                    <span className="ws-pill" style={{ opacity: 0.7 }}>
-                      {sug.source}
-                    </span>
+                    {i === active && (
+                      <CornerDownLeft className="size-3 shrink-0 text-foreground/30" strokeWidth={1.75} />
+                    )}
                   </div>
                 );
               })}

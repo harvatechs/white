@@ -75,6 +75,7 @@ model Preferences {
   suggestionCount Int    @default(8)
   accent        String   @default("graphite") // graphite | sage | rose | amber | slate
   customAccent  String?  // hex color override, null = use preset
+  searchAlgorithm String @default("relevance") // relevance | recency | diverse | markov | alphabetical
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }

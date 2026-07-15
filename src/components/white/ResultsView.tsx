@@ -10,10 +10,12 @@ import { ResultList } from "./ResultCard";
 import { Footer } from "./Footer";
 import { HistoryPanel } from "./HistoryPanel";
 import { ReadingPane } from "./ReadingPane";
+import { ImageGrid } from "./ImageGrid";
 import { useWhite } from "@/lib/store";
 import type { SearchCategory, SearchResponse, SearchResultItem } from "@/lib/types";
 import { InstantAnswerCard, type InstantAnswerData } from "./InstantAnswerCard";
 import { TimeRangeFilter, TIME_RANGE_DAYS, type TimeRange } from "./TimeRangeFilter";
+import { cn } from "@/lib/utils";
 
 interface ResultsViewProps {
   query: string;
@@ -74,6 +76,8 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       return () => { active = false; };
     }, [query, category]);
 
+    const prefs = useWhite((s) => s.prefs);
+
     const runSearch = useCallback(async (q: string, c: SearchCategory, r?: TimeRange) => {
       if (!q.trim()) return;
       setLoading(true);
@@ -82,8 +86,9 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       const myReq = ++reqIdRef.current;
       const range = r ?? timeRange;
       const days = range === "all" ? "" : `&r=${TIME_RANGE_DAYS[range]}`;
+      const algo = `&a=${prefs.searchAlgorithm}`;
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&c=${c}&num=15${days}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&c=${c}&num=15${days}${algo}`);
         const data = (await res.json()) as SearchResponse;
         if (myReq === reqIdRef.current) {
           setResults(data.results ?? []);
@@ -97,7 +102,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       } finally {
         if (myReq === reqIdRef.current) setLoading(false);
       }
-    }, [setFocusedIndex, timeRange]);
+    }, [setFocusedIndex, timeRange, prefs.searchAlgorithm]);
 
     useEffect(() => {
       runSearch(query, category);
@@ -279,19 +284,28 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
         </div>
 
         {/* Results */}
-        <main className="mx-auto w-full max-w-3xl flex-1 px-2 pb-10 md:px-6">
-          {/* Instant answer (math, unit, time, definition) */}
-          {instantAnswer && (
+        <main className={cn(
+          "mx-auto w-full flex-1 px-2 pb-10 md:px-6",
+          category === "images" ? "max-w-6xl" : "max-w-3xl"
+        )}>
+          {/* Instant answer (math, unit, time, definition) — web only */}
+          {instantAnswer && category === "web" && (
             <div className="mt-3">
               <InstantAnswerCard answer={instantAnswer} />
             </div>
           )}
 
-          <div className="mt-3 ws-hairline overflow-hidden rounded-2xl ws-surface">
-            <ResultList items={results} loading={loading} query={query} focusedIndex={focusedIndex} />
-          </div>
+          {category === "images" ? (
+            <div className="mt-3">
+              <ImageGrid items={results} loading={loading} query={query} />
+            </div>
+          ) : (
+            <div className="mt-3 ws-hairline overflow-hidden rounded-2xl ws-surface">
+              <ResultList items={results} loading={loading} query={query} focusedIndex={focusedIndex} />
+            </div>
+          )}
 
-          {!loading && history.length > 0 && (
+          {!loading && history.length > 0 && category !== "images" && (
             <div className="mt-8">
               <HistoryPanel onPick={handleSubmit} compact />
             </div>

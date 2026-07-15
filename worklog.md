@@ -350,3 +350,78 @@ Unresolved / Next-phase priorities:
 - Could add a "feels like" temperature + humidity to weather card.
 - Service worker could cache last search for true offline search.
 - Could add a settings sync via export URL (shareable preferences link).
+
+---
+Task ID: 7
+Agent: main (user-requested redesign)
+Task: Major UI/UX redesign — cleaner/minimal home, luxurious search bar, compressed footer, search algorithm selection, advanced autofill, proper image grid, mobile responsiveness.
+
+Work Log:
+- Reviewed current HomeView, SearchBox, Footer, and image search handling.
+- Redesigned HomeView: removed all tagline text, pills, keyboard hints. Now just: centered WHITE logo + luxurious search bar + recent/popular (only if they exist). Minimal and clean.
+- Redesigned SearchBox with luxury styling:
+  - New `.ws-searchfield-luxury` CSS class with refined border + focus states (border lightens on focus, subtle background tint).
+  - Animated box-shadow on focus (framer-motion) — deeper shadow when focused for depth.
+  - Search icon changes color on focus (from muted to accent).
+  - Tab key now autocompletes the selected suggestion into the input (advanced autofill).
+  - Faster debounce (60ms vs 90ms) for snappier autofill.
+  - Mobile-optimized: smaller padding on mobile, scales up on sm: breakpoints.
+  - Search button is now a clean icon-only button (ArrowRight) with active:scale-95.
+  - Suggestions dropdown: backdrop-blur, luxury suggestion rows with active indicator (CornerDownLeft icon).
+- Compressed Footer into a single menu button:
+  - Removed all 8 footer nav buttons.
+  - Single Menu icon button that opens an expandable dropdown with all options (Customize, Bookmarks, Domain ranking, Search stats, Markov Inspector, Keyboard shortcuts, About, Open source).
+  - Philosophy ticker compressed into the menu footer.
+  - Animated dropdown with framer-motion (opacity + y + scale).
+- Added Search Algorithm selection (user-requested "choosing their own algorithm"):
+  - New `SearchAlgorithm` type: "relevance" | "recency" | "diverse" | "markov" | "alphabetical".
+  - New `searchAlgorithm` column on Preferences Prisma model.
+  - Updated `/api/search` to apply the algorithm:
+    - `relevance`: SDK's natural ranking (default).
+    - `recency`: sort by date descending.
+    - `diverse`: max 2 results per domain, interleaved.
+    - `markov`: boost domains the user has clicked before (people-powered).
+    - `alphabetical`: A-Z by title.
+  - Added algorithm selector to SettingsSheet: 5 radio-card options with descriptions.
+  - Updated ResultsView to pass `&a=` param to search API.
+  - Updated preferences API to persist/validate searchAlgorithm.
+- Advanced autofill (user-requested):
+  - Enhanced `suggest()` in markov.ts with:
+    - Substring matching for history (not just prefix) — finds queries that contain the typed text.
+    - Trigram lookahead: if the last token has a strong Markov edge, also predicts the token AFTER that (2-token prediction).
+    - Faster debounce in SearchBox (60ms).
+    - Tab to autocomplete selected suggestion.
+- Built proper Image Grid (user-requested "Google Images style"):
+  - New `ImageGrid.tsx` component with CSS columns masonry layout: 2 columns on mobile, 3 on sm, 4 on md, 5 on lg.
+  - Image tiles with: square aspect ratio, hover overlay (title + host + ExternalLink icon), caption below, letterbox fallback on error, lazy loading, framer-motion staggered entry.
+  - Updated `search.ts` to request more results for images (num*2) and use image-oriented query ("{query} images").
+  - Updated image filtering to also match image-sharing sites (unsplash, pexels, flickr, imgur, etc.) not just file extensions.
+  - Updated ResultsView to use ImageGrid when category === "images", with wider max-width (6xl vs 3xl).
+- Mobile responsiveness:
+  - SearchBox: responsive padding/sizing (px-3.5 py-2.5 on mobile, sm:px-4 sm:py-3 on larger).
+  - HomeView: px-4 on mobile, sm:px-6.
+  - Footer: single button, no wrapping issues.
+  - Image grid: 2 columns on mobile, scales up.
+  - VLM-confirmed: "Search bar properly sized for mobile. Logo centered and well-sized. Footer minimal. No mobile issues."
+- Fixed bug: `cn` not imported in SettingsSheet (caused client-side error). Added import.
+- Verified via agent-browser:
+  - Home: clean, centered logo, luxurious search bar, no tagline, single menu button.
+  - Image search: masonry grid with 5 images, responsive columns.
+  - Settings: algorithm selector with 5 options.
+  - Footer menu: expands with all 8 options.
+  - Mobile (390px): properly sized, centered, minimal.
+  - No console errors.
+- Ran `bun run lint` — clean (0 errors, 0 warnings).
+
+Stage Summary:
+- Major UI/UX redesign completed: cleaner, more minimal, luxurious search bar, compressed footer.
+- 5 search algorithms added (relevance, recency, diverse, markov, alphabetical).
+- Advanced autofill with trigram lookahead + substring matching.
+- Proper image grid (masonry, responsive, Google Images-style).
+- Mobile-verified, lint clean, no console errors.
+
+Unresolved / Next-phase priorities:
+- Image grid could use natural aspect ratios (masonry with varied heights) instead of square tiles.
+- More seed queries for broader coverage ("almost all pages listed").
+- Algorithm could have a visual indicator on the results page showing which is active.
+- Mobile could have a bottom navigation bar for quick tab switching.

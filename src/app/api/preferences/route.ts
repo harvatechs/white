@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getOrCreateSessionId, setSessionCookie } from "@/lib/session";
 import { DEFAULT_PREFS } from "@/lib/store";
-import type { AccentName, Density, FontScale, UserPreferences, WhiteTheme } from "@/lib/types";
+import type { AccentName, Density, FontScale, SearchAlgorithm, UserPreferences, WhiteTheme } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +12,7 @@ const VALID_THEMES: WhiteTheme[] = ["pure","ivory","snow","pearl","alabaster","g
 const VALID_DENSITY: Density[] = ["comfortable","compact","airy"];
 const VALID_FONT: FontScale[] = ["small","base","large"];
 const VALID_ACCENT: AccentName[] = ["graphite","sage","rose","amber","slate"];
+const VALID_ALGO: SearchAlgorithm[] = ["relevance","recency","diverse","markov","alphabetical"];
 
 export async function GET() {
   const sessionId = await getOrCreateSessionId();
@@ -30,6 +31,7 @@ export async function GET() {
           suggestionCount: row.suggestionCount,
           accent: (row.accent as AccentName) || DEFAULT_PREFS.accent,
           customAccent: row.customAccent ?? null,
+          searchAlgorithm: (VALID_ALGO.includes(row.searchAlgorithm as SearchAlgorithm) ? row.searchAlgorithm : DEFAULT_PREFS.searchAlgorithm) as SearchAlgorithm,
         }
       : { ...DEFAULT_PREFS, sessionId };
 
@@ -58,6 +60,7 @@ export async function PUT(req: NextRequest) {
       suggestionCount: Math.min(Math.max(parseInt(body.suggestionCount, 10) || DEFAULT_PREFS.suggestionCount, 3), 15),
       accent: VALID_ACCENT.includes(body.accent) ? body.accent : DEFAULT_PREFS.accent,
       customAccent: typeof body.customAccent === "string" && /^#[0-9a-f]{6}$/i.test(body.customAccent) ? body.customAccent : null,
+      searchAlgorithm: VALID_ALGO.includes(body.searchAlgorithm) ? body.searchAlgorithm : DEFAULT_PREFS.searchAlgorithm,
     };
 
     const row = await db.preferences.upsert({

@@ -35,6 +35,7 @@ export const DEFAULT_PREFS: UserPreferences = {
   suggestionCount: 8,
   accent: "graphite",
   customAccent: null,
+  searchAlgorithm: "relevance",
 };
 
 interface WhiteStore {

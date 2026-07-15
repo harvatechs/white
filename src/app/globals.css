@@ -158,6 +158,41 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02), 0 8px 30px rgba(0, 0, 0, 0.04);
 }
 
+/* Luxury search field — the hero search bar on home */
+.ws-searchfield-luxury {
+  background: var(--ws-surface);
+  border: 1px solid color-mix(in srgb, var(--ws-accent) 8%, transparent);
+  transition: border-color 280ms ease, background-color 280ms ease;
+}
+.ws-searchfield-luxury[data-focused="true"] {
+  border-color: color-mix(in srgb, var(--ws-accent) 22%, transparent);
+  background: color-mix(in srgb, var(--ws-surface) 96%, var(--ws-accent) 1%);
+}
+
+/* Suggestion row — luxury */
+.ws-suggestion-luxury {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  color: var(--foreground);
+  transition: background-color 100ms ease;
+  border-bottom: 1px solid color-mix(in srgb, var(--ws-accent) 3%, transparent);
+}
+.ws-suggestion-luxury:last-child {
+  border-bottom: none;
+}
+.ws-suggestion-luxury:hover,
+.ws-suggestion-luxury[data-active="true"] {
+  background: color-mix(in srgb, var(--ws-accent) 4%, transparent);
+}
+.ws-suggestion-luxury mark {
+  background: transparent;
+  color: var(--ws-accent);
+  font-weight: 600;
+}
+
 /* Result card hover */
 .ws-result {
   transition: background-color 180ms ease, transform 180ms ease;

@@ -85,16 +85,25 @@ export async function runSearch(
     args.recency_days = 7;
   }
 
+  // For images, request more results and use image-oriented query
+  if (category === "images") {
+    args.num = Math.min(num * 2, 30);
+    args.query = `${query} images`;
+  }
+
   const raw = (await zai.functions.invoke("web_search", args)) as SearchSource[];
 
   let results = transform(raw ?? [], category);
 
   // images / videos: filter by url hints (best-effort, since SDK returns web results)
   if (category === "images") {
-    results = results.filter(
-      (r) => /\.(png|jpe?g|gif|webp|svg|avif)$/i.test(r.url) || /\.(png|jpe?g|gif|webp|svg|avif)$/i.test(r.host_name)
+    // Keep results that either have an image URL or are from image-sharing sites
+    const imageExt = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
+    const imageSites = /unsplash|pexels|flickr|imgur|shutterstock|getty|pixabay|stock|deviantart|behance|dribbble|pinterest|500px/i;
+    const imageResults = results.filter(
+      (r) => imageExt.test(r.url) || imageSites.test(r.host_name) || imageExt.test(r.snippet)
     );
-    if (results.length === 0) results = transform(raw ?? [], category); // fallback
+    results = imageResults.length > 0 ? imageResults : results;
   }
   if (category === "videos") {
     results = results.filter(

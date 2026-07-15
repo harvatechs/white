@@ -61,6 +61,7 @@ export interface UserPreferences {
   suggestionCount: number;
   accent: AccentName;
   customAccent: string | null; // hex color, overrides accent when set
+  searchAlgorithm: SearchAlgorithm;
 }
 
 export interface HistoryItem {
@@ -130,3 +131,5 @@ export interface MarkovInspectorData {
 export type ViewState = "home" | "results";
 
 export type TimeRange = "all" | "day" | "week" | "month" | "year";
+
+export type SearchAlgorithm = "relevance" | "recency" | "diverse" | "markov" | "alphabetical";

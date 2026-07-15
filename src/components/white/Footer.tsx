@@ -2,16 +2,18 @@
 
 import { useWhite } from "@/lib/store";
 import { WhiteLogo } from "./WhiteLogo";
+import { Settings, Menu } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Info,
-  Settings,
-  Github,
-  Sparkles,
   Bookmark,
   Network,
-  Keyboard,
   Sliders,
   BarChart3,
+  Info,
+  Keyboard,
+  Github,
+  X,
 } from "lucide-react";
 
 export function Footer() {
@@ -22,96 +24,101 @@ export function Footer() {
   const setShowShortcuts = useWhite((s) => s.setShowShortcuts);
   const setShowDomainRules = useWhite((s) => s.setShowDomainRules);
   const setShowStats = useWhite((s) => s.setShowStats);
+  const setShowCommand = useWhite((s) => s.setShowCommand);
   const bookmarkCount = useWhite((s) => s.bookmarks.length);
   const domainRuleCount = useWhite((s) => s.domainRules.length);
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
+
+  const items = [
+    { label: "Customize", icon: Settings, action: () => setShowSettings(true) },
+    { label: "Bookmarks", icon: Bookmark, action: () => setShowBookmarks(true), badge: bookmarkCount },
+    { label: "Domain ranking", icon: Sliders, action: () => setShowDomainRules(true), badge: domainRuleCount },
+    { label: "Search stats", icon: BarChart3, action: () => setShowStats(true) },
+    { label: "Markov Inspector", icon: Network, action: () => setShowMarkov(true) },
+    { label: "Keyboard shortcuts", icon: Keyboard, action: () => setShowShortcuts(true) },
+    { label: "About WHITE", icon: Info, action: () => setShowAbout(true) },
+    { label: "Open source", icon: Github, action: () => window.open("https://github.com", "_blank", "noopener") },
+  ];
+
   return (
-    <footer className="mt-auto ws-hairline-t">
-      <div className="mx-auto max-w-5xl px-5 py-5">
-        <div className="flex flex-col items-center gap-4 md:flex-row md:items-center md:justify-between">
-          {/* Brand */}
-          <div className="flex items-center gap-2.5">
-            <WhiteLogo size="sm" showDot={false} />
-            <span className="hidden text-[12px] text-foreground/40 sm:inline">
-              · clean search · no ads
-            </span>
-          </div>
+    <footer className="mt-auto">
+      <div className="mx-auto flex max-w-5xl items-center justify-center px-4 py-4 sm:py-5">
+        {/* Brand — tiny */}
+        <div className="flex items-center gap-2">
+          <WhiteLogo size="sm" showDot={false} />
+        </div>
 
-          {/* Primary nav */}
-          <nav className="flex flex-wrap items-center justify-center gap-0.5">
-            <FooterButton onClick={() => setShowBookmarks(true)} icon={Bookmark} label="Bookmarks" badge={bookmarkCount || undefined} />
-            <FooterButton onClick={() => setShowDomainRules(true)} icon={Sliders} label="Ranking" badge={domainRuleCount || undefined} />
-            <FooterButton onClick={() => setShowStats(true)} icon={BarChart3} label="Stats" />
-            <FooterButton onClick={() => setShowMarkov(true)} icon={Network} label="Markov" />
-            <FooterButton onClick={() => setShowSettings(true)} icon={Settings} label="Customize" />
-            <FooterButton onClick={() => setShowAbout(true)} icon={Info} label="About" />
-            <FooterButton onClick={() => setShowShortcuts(true)} icon={Keyboard} label="Shortcuts" />
-            <FooterButton
-              onClick={() => window.open("https://github.com", "_blank", "noopener")}
-              icon={Github}
-              label="Source"
-            />
-          </nav>
+        {/* Single settings button with expandable menu */}
+        <div ref={menuRef} className="relative ml-auto">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            className="flex size-9 items-center justify-center rounded-full text-foreground/45 hover:ws-whisper hover:text-foreground/80 transition-colors"
+            aria-label="Menu"
+            aria-expanded={menuOpen}
+          >
+            <Menu className="size-4" strokeWidth={1.75} />
+          </button>
 
-          {/* Philosophy */}
-          <p className="ws-ticker text-[11px] text-foreground/40">
-            of the people · by the people · for the people
-          </p>
+          <AnimatePresence>
+            {menuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute bottom-[calc(100%+8px)] right-0 z-50 w-60 overflow-hidden rounded-2xl border border-foreground/8 backdrop-blur-xl"
+                style={{
+                  background: "color-mix(in srgb, var(--ws-surface) 94%, transparent)",
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.04)",
+                }}
+                role="menu"
+              >
+                {items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        item.action();
+                        setMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13px] font-medium text-foreground/70 hover:bg-[color-mix(in_srgb,var(--ws-accent)_4%,transparent)] hover:text-foreground transition-colors"
+                    >
+                      <Icon className="size-4 shrink-0 text-foreground/45" strokeWidth={1.75} />
+                      <span className="flex-1">{item.label}</span>
+                      {item.badge ? (
+                        <span
+                          className="inline-flex min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums"
+                          style={{ background: "var(--ws-accent-soft)", color: "var(--ws-accent)" }}
+                        >
+                          {item.badge}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+                <div className="border-t border-foreground/6 px-4 py-2 text-center text-[10px] text-foreground/30">
+                  of the people · by the people · for the people
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </footer>
-  );
-}
-
-function FooterButton({
-  onClick,
-  icon: Icon,
-  label,
-  badge,
-}: {
-  onClick: () => void;
-  icon: typeof Info;
-  label: string;
-  badge?: number;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="relative inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-foreground/55 hover:ws-whisper hover:text-foreground transition-colors"
-    >
-      <Icon className="size-3.5" strokeWidth={1.75} />
-      <span className="hidden sm:inline">{label}</span>
-      {badge !== undefined && (
-        <span
-          className="ml-0.5 inline-flex min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums"
-          style={{ background: "var(--ws-accent-soft)", color: "var(--ws-accent)" }}
-        >
-          {badge}
-        </span>
-      )}
-    </button>
-  );
-}
-
-export function HomeTagline() {
-  return (
-    <div className="mt-8 flex flex-col items-center gap-3 text-center">
-      <p className="max-w-md text-[13px] leading-relaxed text-foreground/45">
-        The world&rsquo;s cleanest search engine. No ads. No sponsors. No tracking. Just the open
-        web — and a transparent Markov chain that learns from you.
-      </p>
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <span className="ws-pill">
-          <Sparkles className="size-3" /> Markov-powered
-        </span>
-        <span className="ws-pill" style={{ opacity: 0.7 }}>
-          100% open source
-        </span>
-        <span className="ws-pill" style={{ opacity: 0.7 }}>
-          8 white themes
-        </span>
-      </div>
-    </div>
   );
 }

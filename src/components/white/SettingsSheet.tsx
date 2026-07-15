@@ -12,10 +12,11 @@ import { Slider } from "@/components/ui/slider";
 import { useWhite } from "@/lib/store";
 import { ACCENTS, THEMES } from "@/lib/themes";
 import { applyTheme } from "@/lib/themes";
-import type { AccentName, Density, FontScale, WhiteTheme } from "@/lib/types";
+import type { AccentName, Density, FontScale, SearchAlgorithm, WhiteTheme } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Trash2, RotateCcw, Download, Upload } from "lucide-react";
 import { useRef } from "react";
+import { cn } from "@/lib/utils";
 
 export function SettingsSheet() {
   const open = useWhite((s) => s.showSettings);
@@ -194,6 +195,50 @@ export function SettingsSheet() {
             </div>
           </section>
 
+          {/* SEARCH ALGORITHM */}
+          <section className="pt-5">
+            <SectionLabel>Search algorithm</SectionLabel>
+            <p className="mt-1 text-[12px] text-foreground/50">
+              Choose how WHITE ranks your results. No bias — your choice.
+            </p>
+            <div className="mt-3 flex flex-col gap-1.5">
+              {([
+                { id: "relevance", label: "Relevance", desc: "The open web's natural ranking" },
+                { id: "recency", label: "Most recent", desc: "Newest results first" },
+                { id: "diverse", label: "Diverse", desc: "Max 2 per domain — broad sources" },
+                { id: "markov", label: "Markov-boosted", desc: "Surfaces sites you click often" },
+                { id: "alphabetical", label: "Alphabetical", desc: "A → Z by title" },
+              ] as { id: SearchAlgorithm; label: string; desc: string }[]).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => save({ searchAlgorithm: opt.id })}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-all",
+                    prefs.searchAlgorithm === opt.id
+                      ? "border-[color-mix(in_srgb,var(--ws-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--ws-accent)_4%,transparent)]"
+                      : "border-foreground/8 hover:bg-[color-mix(in_srgb,var(--ws-accent)_2%,transparent)]"
+                  )}
+                >
+                  <div
+                    className="flex size-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors"
+                    style={{
+                      borderColor: prefs.searchAlgorithm === opt.id ? "var(--ws-accent)" : "color-mix(in srgb, var(--foreground) 20%, transparent)",
+                    }}
+                  >
+                    {prefs.searchAlgorithm === opt.id && (
+                      <div className="size-2 rounded-full" style={{ background: "var(--ws-accent)" }} />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-medium">{opt.label}</p>
+                    <p className="text-[11.5px] text-foreground/45">{opt.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+
           {/* DENSITY */}
           <section className="pt-5">
             <SectionLabel>Density</SectionLabel>
@@ -327,6 +372,7 @@ export function SettingsSheet() {
                     suggestionCount: 8,
                     accent: "graphite",
                     customAccent: null,
+                    searchAlgorithm: "relevance",
                   })
                 }
                 className="flex items-center justify-center gap-2 rounded-xl ws-hairline px-4 py-2.5 text-[13px] font-medium hover:ws-whisper transition-colors"
