@@ -20,7 +20,7 @@ async function getZai() {
 }
 
 interface InstantAnswer {
-  kind: "math" | "unit" | "time" | "definition" | "calc";
+  kind: "math" | "unit" | "time" | "definition" | "calc" | "weather";
   title: string;
   value: string;
   detail?: string;
@@ -200,6 +200,48 @@ async function tryDefinition(q: string): Promise<InstantAnswer | null> {
   }
 }
 
+// --- Weather (via web search, parsed) ---
+async function tryWeather(q: string): Promise<InstantAnswer | null> {
+  const lower = q.toLowerCase().trim();
+  const m = lower.match(/^(?:weather|temperature|forecast)(?:\s+in\s+(.+))?(?:\s+today)?$/);
+  if (!m) return null;
+  const location = m[1]?.trim() || "my location";
+
+  try {
+    const zai = await getZai();
+    const results = (await zai.functions.invoke("web_search", {
+      query: `weather ${location} today temperature`,
+      num: 5,
+    })) as { name?: string; snippet?: string; host_name?: string }[];
+
+    // look for a snippet that contains a temperature pattern
+    // Match temperature with explicit unit: "68°F", "20°C", "68 F", "20 C", "68 degrees F"
+    // Require the unit to avoid matching random numbers
+    const tempPattern = /(-?\d{1,3}(?:\.\d+)?)\s*(?:°|degrees?\s*)?\s*([fc])\b/i;
+    const conditionPattern = /(sunny|cloudy|overcast|rain(?:y|ing)?|snow(?:y|ing)?|clear|fog(?:gy)?|wind(?:y)?|storm(?:y)?|thunderstorm|haze|mist)/i;
+
+    for (const r of results) {
+      const text = `${r.name ?? ""} ${r.snippet ?? ""}`;
+      const tempMatch = text.match(tempPattern);
+      const condMatch = text.match(conditionPattern);
+      if (tempMatch) {
+        const unitChar = tempMatch[2].toUpperCase();
+        const temp = `${tempMatch[1]}°${unitChar}`;
+        const condition = condMatch ? condMatch[1].charAt(0).toUpperCase() + condMatch[1].slice(1) : "";
+        return {
+          kind: "weather",
+          title: `Weather in ${location}`,
+          value: temp,
+          detail: condition ? `${condition} · via ${r.host_name ?? "web"}` : `via ${r.host_name ?? "web"}`,
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
   if (!q) return NextResponse.json({ answer: null });
@@ -214,6 +256,10 @@ export async function GET(req: NextRequest) {
 
     const time = tryTime(q);
     if (time) return NextResponse.json({ answer: time });
+
+    // weather needs a web search
+    const weather = await tryWeather(q);
+    if (weather) return NextResponse.json({ answer: weather });
 
     // definition needs LLM — only for "define X" style queries
     const def = await tryDefinition(q);

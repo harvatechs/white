@@ -128,3 +128,5 @@ export interface MarkovInspectorData {
 }
 
 export type ViewState = "home" | "results";
+
+export type TimeRange = "all" | "day" | "week" | "month" | "year";

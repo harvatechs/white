@@ -289,3 +289,64 @@ Unresolved / Next-phase priorities:
 - PWA could add a "install app" prompt banner.
 - Service worker could cache the last search results for true offline search history.
 - Could add a command palette (Cmd+K) for quick navigation between features.
+
+---
+Task ID: 6
+Agent: webDevReview cron (round 5)
+Task: QA the current build, then add Command Palette (Cmd+K), time-range filter, weather instant answer, and PWA install banner.
+
+Work Log:
+- Reviewed worklog.md from Tasks 1-5 — project stable with 14 features.
+- Performed QA with agent-browser (1440x900):
+  - Home, search, instant answers (42*17=714), j/k nav, reading mode, Markov graph all functional.
+  - No console errors.
+  - VLM analysis of home: search box slightly cluttered with mic+search buttons, suggested consolidating; right-side controls cramped.
+- No bugs found — project is stable.
+- Built Command Palette (Cmd+K):
+  - New `CommandPalette.tsx` component with: search input, grouped results (Navigation, Themes, Recent searches, Data), keyboard nav (↑/↓/Enter), active highlighting, scroll-into-view, fuzzy filter by label/keywords.
+  - Commands: Go home, Open Bookmarks/Markov/Domain ranking/Stats/Shortcuts/Settings/About, Export data, 8 theme switches, 5 recent searches.
+  - Added `showCommand` + `setShowCommand` to store.
+  - Added `Cmd/Ctrl+K` shortcut to keyboard hook (works even while typing).
+  - Updated ShortcutsHelp with `⌘K` entry.
+  - Wired into page.tsx.
+- Built Time-Range Filter:
+  - New `TimeRangeFilter.tsx` component with segmented control: All time, Past 24h, Past week, Past month, Past year.
+  - New `TimeRange` type in types.ts, `timeRange` state + `setTimeRange` in store.
+  - Updated `runSearch` in search.ts to accept `recencyDays` param, passes to `zai.functions.invoke("web_search", { recency_days })`. Cache key now includes recency.
+  - Updated `/api/search` to accept `r` (recency days) query param.
+  - Updated ResultsView to render TimeRangeFilter in meta bar, re-runs search on change.
+- Built Weather Instant Answer:
+  - Added `tryWeather` to `/api/answer` — matches "weather [in X]", "temperature [in X]", "forecast [in X]".
+  - Fetches via web search, parses snippets for temperature pattern (requires explicit °F/°C unit) + weather condition (sunny/cloudy/rain/clear/etc.).
+  - Fixed temperature unit detection bug (was defaulting to C for degree-only matches; now requires explicit F/C).
+  - Added "weather" kind to InstantAnswerData, CloudSun icon, "Weather" label.
+  - Updated InstantAnswerCard to use text layout for definitions (16px medium) vs value layout for numeric answers (28px semibold).
+- Built PWA Install Banner:
+  - New `InstallBanner.tsx` — listens for `beforeinstallprompt`, shows a slide-up card after 4s delay with Install/Dismiss buttons.
+  - Respects localStorage dismiss flag, never shows in standalone mode.
+  - Animated with framer-motion (opacity + y + scale).
+  - Wired into page.tsx.
+- Updated layout.tsx with appleWebApp config (capable, statusBarStyle, title).
+- Verified all features end-to-end via agent-browser:
+  - Command palette: Cmd+K opens, typing "theme" filters to 8 theme commands, arrow nav works, Enter selects.
+  - Time range: Past week filter returns 10 fresh results.
+  - Weather: "weather in paris" → "86°F" card with CloudSun icon (VLM-confirmed clean design).
+  - Instant answers: math (42*17=714), unit conversion, time, definitions all still work.
+  - No console errors throughout.
+  - VLM: "Weather card design is clean. Visually distinct from result cards."
+- Ran `bun run lint` — clean (0 errors, 0 warnings).
+
+Stage Summary:
+- WHITE Search now has 4 major new features: Command Palette (Cmd+K), time-range filter, weather instant answer, and PWA install banner.
+- 4 new UI components, 1 new API feature (weather), 1 new type, 4 new store fields.
+- Lint clean, all features browser-verified, VLM-confirmed.
+- Dev server healthy on port 3000.
+
+Unresolved / Next-phase priorities:
+- Currency conversion with live rates (needs a rates API or web-scraped).
+- Command palette could add "search history" and "clear all data" commands.
+- Time range filter could show on home view too.
+- PWA install banner needs real `beforeinstallprompt` testing (Chrome only).
+- Could add a "feels like" temperature + humidity to weather card.
+- Service worker could cache last search for true offline search.
+- Could add a settings sync via export URL (shareable preferences link).

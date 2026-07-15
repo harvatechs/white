@@ -18,6 +18,7 @@ interface ShortcutHandlers {
 //   g then m     open markov inspector
 //   g then d     open domain ranking
 //   g then t     open search stats
+//   Cmd/Ctrl+K   open command palette
 //   ?            show shortcuts help
 //   j / k        navigate results (handled in ResultsView)
 //   Enter        open reading mode for focused result
@@ -30,6 +31,7 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
   const setShowBookmarks = useWhite((s) => s.setShowBookmarks);
   const setShowDomainRules = useWhite((s) => s.setShowDomainRules);
   const setShowStats = useWhite((s) => s.setShowStats);
+  const setShowCommand = useWhite((s) => s.setShowCommand);
   const view = useWhite((s) => s.view);
 
   useEffect(() => {
@@ -44,6 +46,13 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
     const onKey = (e: KeyboardEvent) => {
       // If Radix already handled Escape (closing a dialog), don't also go home
       if (e.defaultPrevented) return;
+
+      // Cmd/Ctrl+K opens command palette (works even while typing)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setShowCommand(true);
+        return;
+      }
 
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
@@ -63,6 +72,7 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
           useWhite.getState().showBookmarks ||
           useWhite.getState().showDomainRules ||
           useWhite.getState().showStats ||
+          useWhite.getState().showCommand ||
           !!useWhite.getState().preview;
 
         if (anyOpen) return; // let the dialog/sheet/pane handle it
@@ -136,5 +146,5 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       window.removeEventListener("keydown", onKey);
       if (gTimer) clearTimeout(gTimer);
     };
-  }, [view, handlers, setShowSettings, setShowAbout, setShowShortcuts, setShowMarkov, setShowBookmarks, setShowDomainRules, setShowStats]);
+  }, [view, handlers, setShowSettings, setShowAbout, setShowShortcuts, setShowMarkov, setShowBookmarks, setShowDomainRules, setShowStats, setShowCommand]);
 }

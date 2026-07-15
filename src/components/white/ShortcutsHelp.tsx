@@ -11,6 +11,7 @@ import { useWhite } from "@/lib/store";
 
 const SHORTCUTS: { keys: string[]; label: string; group: string }[] = [
   { keys: ["/"], label: "Focus the search field", group: "Search" },
+  { keys: ["⌘K"], label: "Open command palette", group: "Search" },
   { keys: ["Esc"], label: "Go home / close overlay", group: "Search" },
   { keys: ["?"], label: "Show this help", group: "Search" },
   { keys: ["j"], label: "Next result", group: "Results" },

@@ -16,13 +16,15 @@ export async function GET(req: NextRequest) {
   const q = (sp.get("q") ?? "").trim();
   const category = (sp.get("c") as SearchCategory) || "web";
   const num = Math.min(parseInt(sp.get("num") ?? "12", 10) || 12, 30);
+  const recency = sp.get("r");
+  const recencyDays = recency ? parseInt(recency, 10) : undefined;
 
   if (!q) return NextResponse.json({ error: "missing q" }, { status: 400 });
   if (!VALID.includes(category)) return NextResponse.json({ error: "bad category" }, { status: 400 });
 
   try {
     await ensureSeed();
-    const res = await runSearch(q, category, num);
+    const res = await runSearch(q, category, num, recencyDays && recencyDays > 0 ? recencyDays : undefined);
 
     // Apply per-session domain rules: block removes, raise/lower re-sorts
     const sessionId = await getOrCreateSessionId();

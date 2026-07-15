@@ -17,6 +17,7 @@ import type {
   SearchCategory,
   SearchResultItem,
   SuggestionItem,
+  TimeRange,
   UserPreferences,
   ViewState,
   WhiteTheme,
@@ -58,10 +59,13 @@ interface WhiteStore {
   showBookmarks: boolean;
   showDomainRules: boolean;
   showStats: boolean;
+  showCommand: boolean;
   // Reading Mode
   preview: { item: SearchResultItem; data: PreviewData | null; loading: boolean; error: string | null } | null;
   // j/k navigation
   focusedIndex: number;
+  // time range filter
+  timeRange: TimeRange;
 
   setView: (v: ViewState) => void;
   setQuery: (q: string) => void;
@@ -83,11 +87,13 @@ interface WhiteStore {
   setShowBookmarks: (b: boolean) => void;
   setShowDomainRules: (b: boolean) => void;
   setShowStats: (b: boolean) => void;
+  setShowCommand: (b: boolean) => void;
   setDomainRules: (r: DomainRule[]) => void;
   setDomainRule: (host: string, action: DomainAction) => void;
   removeDomainRule: (host: string) => void;
   setPreview: (p: WhiteStore["preview"]) => void;
   setFocusedIndex: (i: number | ((prev: number) => number)) => void;
+  setTimeRange: (r: TimeRange) => void;
 
   resetToHome: () => void;
 }
@@ -114,8 +120,10 @@ export const useWhite = create<WhiteStore>((set, get) => ({
   showBookmarks: false,
   showDomainRules: false,
   showStats: false,
+  showCommand: false,
   preview: null,
   focusedIndex: -1,
+  timeRange: "all" as TimeRange,
 
   setView: (v) => set({ view: v }),
   setQuery: (q) => set({ query: q }),
@@ -150,6 +158,7 @@ export const useWhite = create<WhiteStore>((set, get) => ({
   setShowBookmarks: (b) => set({ showBookmarks: b }),
   setShowDomainRules: (b) => set({ showDomainRules: b }),
   setShowStats: (b) => set({ showStats: b }),
+  setShowCommand: (b) => set({ showCommand: b }),
   setDomainRules: (r) =>
     set({
       domainRules: r,
@@ -179,6 +188,7 @@ export const useWhite = create<WhiteStore>((set, get) => ({
     set((s) => ({
       focusedIndex: typeof i === "function" ? (i as (prev: number) => number)(s.focusedIndex) : i,
     })),
+  setTimeRange: (r) => set({ timeRange: r }),
 
   resetToHome: () => set({ view: "home", query: "", suggestions: [], preview: null, focusedIndex: -1 }),
 }));

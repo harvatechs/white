@@ -13,6 +13,7 @@ import { ReadingPane } from "./ReadingPane";
 import { useWhite } from "@/lib/store";
 import type { SearchCategory, SearchResponse, SearchResultItem } from "@/lib/types";
 import { InstantAnswerCard, type InstantAnswerData } from "./InstantAnswerCard";
+import { TimeRangeFilter, TIME_RANGE_DAYS, type TimeRange } from "./TimeRangeFilter";
 
 interface ResultsViewProps {
   query: string;
@@ -39,6 +40,8 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
     const setFocusedIndex = useWhite((s) => s.setFocusedIndex);
     const preview = useWhite((s) => s.preview);
     const setPreview = useWhite((s) => s.setPreview);
+    const timeRange = useWhite((s) => s.timeRange);
+    const setTimeRange = useWhite((s) => s.setTimeRange);
 
     const [results, setResults] = useState<SearchResultItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -71,15 +74,17 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       return () => { active = false; };
     }, [query, category]);
 
-    const runSearch = useCallback(async (q: string, c: SearchCategory) => {
+    const runSearch = useCallback(async (q: string, c: SearchCategory, r?: TimeRange) => {
       if (!q.trim()) return;
       setLoading(true);
       setError(null);
       setFocusedIndex(-1);
       const myReq = ++reqIdRef.current;
+      const range = r ?? timeRange;
+      const days = range === "all" ? "" : `&r=${TIME_RANGE_DAYS[range]}`;
       try {
-        const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&c=${c}&num=15`);
-        const data = (await r.json()) as SearchResponse;
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&c=${c}&num=15${days}`);
+        const data = (await res.json()) as SearchResponse;
         if (myReq === reqIdRef.current) {
           setResults(data.results ?? []);
           setMeta({ tookMs: data.tookMs, total: data.total, cached: data.cached });
@@ -92,7 +97,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       } finally {
         if (myReq === reqIdRef.current) setLoading(false);
       }
-    }, [setFocusedIndex]);
+    }, [setFocusedIndex, timeRange]);
 
     useEffect(() => {
       runSearch(query, category);
@@ -236,26 +241,36 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
 
         {/* Meta bar */}
         <div className="mx-auto w-full max-w-3xl px-4 md:px-6 pt-4">
-          {!loading && meta && (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-[12px] text-foreground/45"
-            >
-              About <span className="font-medium text-foreground/70">{meta.total}</span> clean results
-              {meta.tookMs > 0 && <> · {(meta.tookMs / 1000).toFixed(2)}s</>}
-              {meta.cached && (
-                <span className="ws-pill ml-2" style={{ opacity: 0.7 }}>
-                  cached
-                </span>
-              )}
-              {focusedIndex >= 0 && (
-                <span className="ml-3 text-foreground/35">
-                  <kbd className="mr-1">{focusedIndex + 1}</kbd>· <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>Enter</kbd> read · <kbd>o</kbd> open
-                </span>
-              )}
-            </motion.p>
-          )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {!loading && meta && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-[12px] text-foreground/45"
+              >
+                About <span className="font-medium text-foreground/70">{meta.total}</span> clean results
+                {meta.tookMs > 0 && <> · {(meta.tookMs / 1000).toFixed(2)}s</>}
+                {meta.cached && (
+                  <span className="ws-pill ml-2" style={{ opacity: 0.7 }}>
+                    cached
+                  </span>
+                )}
+                {focusedIndex >= 0 && (
+                  <span className="ml-3 text-foreground/35">
+                    <kbd className="mr-1">{focusedIndex + 1}</kbd>· <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>Enter</kbd> read · <kbd>o</kbd> open
+                  </span>
+                )}
+              </motion.p>
+            )}
+            <TimeRangeFilter
+              value={timeRange}
+              onChange={(r) => {
+                setTimeRange(r);
+                runSearch(query, category, r);
+              }}
+              className="ml-auto"
+            />
+          </div>
           {error && (
             <p className="text-[13px]" style={{ color: "var(--destructive)" }}>
               {error}

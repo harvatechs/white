@@ -57,10 +57,11 @@ function transform(sources: SearchSource[], category: SearchCategory): SearchRes
 export async function runSearch(
   query: string,
   category: SearchCategory = "web",
-  num = 12
+  num = 12,
+  recencyDays?: number
 ): Promise<SearchResponse> {
   const started = Date.now();
-  const key = `${category}:${query.toLowerCase().trim()}`;
+  const key = `${category}:${query.toLowerCase().trim()}:${recencyDays ?? "all"}`;
 
   const cached = cache.get(key);
   if (cached && Date.now() - cached.at < CACHE_TTL) {
@@ -76,9 +77,13 @@ export async function runSearch(
 
   const zai = await getZai();
 
-  // news gets a recency filter
+  // news gets a recency filter; explicit recencyDays overrides
   const args: { query: string; num: number; recency_days?: number } = { query, num };
-  if (category === "news") args.recency_days = 7;
+  if (recencyDays && recencyDays > 0) {
+    args.recency_days = recencyDays;
+  } else if (category === "news") {
+    args.recency_days = 7;
+  }
 
   const raw = (await zai.functions.invoke("web_search", args)) as SearchSource[];
 

@@ -1,10 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Calculator, Ruler, Clock, BookOpen } from "lucide-react";
+import { Calculator, Ruler, Clock, BookOpen, CloudSun } from "lucide-react";
 
 export interface InstantAnswerData {
-  kind: "math" | "unit" | "time" | "definition" | "calc";
+  kind: "math" | "unit" | "time" | "definition" | "calc" | "weather";
   title: string;
   value: string;
   detail?: string;
@@ -16,6 +16,7 @@ const KIND_ICON = {
   unit: Ruler,
   time: Clock,
   definition: BookOpen,
+  weather: CloudSun,
 };
 
 const KIND_LABEL = {
@@ -24,11 +25,13 @@ const KIND_LABEL = {
   unit: "Unit conversion",
   time: "Current time",
   definition: "Definition",
+  weather: "Weather",
 };
 
 export function InstantAnswerCard({ answer }: { answer: InstantAnswerData }) {
   const Icon = KIND_ICON[answer.kind] ?? Calculator;
   const label = KIND_LABEL[answer.kind] ?? "Instant answer";
+  const isText = answer.kind === "definition";
 
   return (
     <motion.div
@@ -56,14 +59,17 @@ export function InstantAnswerCard({ answer }: { answer: InstantAnswerData }) {
               no ads
             </span>
           </div>
-          <p className="mt-1 text-[28px] font-semibold leading-tight tracking-tight">
-            {answer.value}
-          </p>
+          {isText ? (
+            <p className="mt-1.5 text-[16px] font-medium leading-snug tracking-tight text-foreground/90">
+              {answer.value}
+            </p>
+          ) : (
+            <p className="mt-1 text-[28px] font-semibold leading-tight tracking-tight">
+              {answer.value}
+            </p>
+          )}
           {answer.detail && (
             <p className="mt-1 text-[13px] text-foreground/55">{answer.detail}</p>
-          )}
-          {answer.kind === "definition" && (
-            <p className="mt-2 text-[14px] leading-relaxed text-foreground/80">{answer.value}</p>
           )}
         </div>
       </div>

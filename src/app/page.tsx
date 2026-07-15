@@ -12,6 +12,8 @@ import { MarkovInspector } from "@/components/white/MarkovInspector";
 import { BookmarksDialog } from "@/components/white/BookmarksDialog";
 import { DomainRulesDialog } from "@/components/white/DomainRulesDialog";
 import { StatsDialog } from "@/components/white/StatsDialog";
+import { CommandPalette } from "@/components/white/CommandPalette";
+import { InstallBanner } from "@/components/white/InstallBanner";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { SearchCategory } from "@/lib/types";
 
@@ -124,6 +126,8 @@ export default function Page() {
       <BookmarksDialog onPick={handleSubmit} />
       <DomainRulesDialog />
       <StatsDialog />
+      <CommandPalette onSearch={handleSubmit} onGoHome={handleBack} />
+      <InstallBanner />
     </>
   );
 }
