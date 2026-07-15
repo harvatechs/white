@@ -1,0 +1,355 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.75rem;
+  /* WHITE Search base — Pure White. Theme variables get overridden at runtime. */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.92 0 0);
+  --input: oklch(0.92 0 0);
+  --ring: oklch(0.5 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  /* WHITE Search runtime theme tokens */
+  --ws-bg: #ffffff;
+  --ws-surface: #ffffff;
+  --ws-whisper: #fafafa;
+  --ws-accent: #1a1a1a;
+  --ws-accent-soft: rgba(26, 26, 26, 0.06);
+  --ws-accent-rgb: 26, 26, 26;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body {
+    background-color: var(--ws-bg);
+    color: var(--foreground);
+    transition: background-color 400ms ease, color 400ms ease;
+  }
+  body {
+    @apply text-foreground antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  ::selection {
+    background: var(--ws-accent);
+    color: #fff;
+  }
+}
+
+/* ---------- WHITE Search design system ---------- */
+
+.ws-app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(var(--ws-accent-rgb), 0.04), transparent 60%),
+    var(--ws-bg);
+}
+
+.ws-surface {
+  background-color: var(--ws-surface);
+}
+
+.ws-whisper {
+  background-color: var(--ws-whisper);
+}
+
+.ws-accent-text {
+  color: var(--ws-accent);
+}
+
+.ws-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ws-bg), 0 0 0 4px var(--ws-accent);
+}
+
+/* Hairline borders everywhere — clean, Apple-like */
+.ws-hairline {
+  border: 1px solid color-mix(in srgb, var(--ws-accent) 8%, transparent);
+}
+.ws-hairline-t {
+  border-top: 1px solid color-mix(in srgb, var(--ws-accent) 8%, transparent);
+}
+.ws-hairline-b {
+  border-bottom: 1px solid color-mix(in srgb, var(--ws-accent) 8%, transparent);
+}
+
+/* The search field — friction-less, borderless, large */
+.ws-searchfield {
+  background: var(--ws-surface);
+  border: 1px solid color-mix(in srgb, var(--ws-accent) 10%, transparent);
+  transition: border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+}
+.ws-searchfield:focus-within {
+  border-color: color-mix(in srgb, var(--ws-accent) 35%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02), 0 8px 30px rgba(0, 0, 0, 0.04);
+}
+
+/* Result card hover */
+.ws-result {
+  transition: background-color 180ms ease, transform 180ms ease;
+  border-radius: 14px;
+}
+.ws-result:hover {
+  background-color: var(--ws-whisper);
+}
+
+/* Letterbox avatar for sources without a favicon */
+.ws-letterbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ws-accent) 10%, transparent);
+  color: var(--ws-accent);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: -0.02em;
+}
+
+/* Tag pill */
+.ws-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: color-mix(in srgb, var(--ws-accent) 6%, transparent);
+  color: var(--ws-accent);
+}
+
+/* Animated wordmark dot */
+@keyframes ws-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
+}
+.ws-pulse {
+  animation: ws-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes ws-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ws-fade-up {
+  animation: ws-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes ws-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.ws-skeleton {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ws-accent) 5%, transparent) 25%,
+    color-mix(in srgb, var(--ws-accent) 9%, transparent) 37%,
+    color-mix(in srgb, var(--ws-accent) 5%, transparent) 63%
+  );
+  background-size: 800px 100%;
+  animation: ws-shimmer 1.4s infinite linear;
+  border-radius: 8px;
+}
+
+/* Custom scrollbar — clean and subtle */
+.ws-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.ws-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ws-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ws-accent) 15%, transparent);
+  border-radius: 999px;
+}
+.ws-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ws-accent) 30%, transparent);
+}
+
+/* Search tabs underline */
+.ws-tab {
+  position: relative;
+  padding: 10px 4px;
+  color: color-mix(in srgb, var(--foreground) 55%, transparent);
+  font-weight: 500;
+  font-size: 14px;
+  transition: color 180ms ease;
+}
+.ws-tab:hover {
+  color: var(--foreground);
+}
+.ws-tab[data-active="true"] {
+  color: var(--foreground);
+}
+.ws-tab[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--ws-accent);
+  border-radius: 2px;
+}
+
+/* Suggestion row */
+.ws-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--foreground);
+  transition: background-color 120ms ease;
+}
+.ws-suggestion:hover,
+.ws-suggestion[data-active="true"] {
+  background: var(--ws-whisper);
+}
+.ws-suggestion .ws-sug-text {
+  font-size: 15px;
+}
+.ws-suggestion .ws-sug-text mark {
+  background: transparent;
+  color: var(--ws-accent);
+  font-weight: 600;
+}
+
+/* Theme swatch button */
+.ws-swatch {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.ws-swatch:hover {
+  transform: translateY(-1px);
+}
+.ws-swatch[data-active="true"] {
+  border-color: var(--ws-accent);
+  box-shadow: 0 0 0 3px var(--ws-accent-soft);
+}
+
+/* Settings control rows */
+.ws-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+}
+.ws-row + .ws-row {
+  border-top: 1px solid color-mix(in srgb, var(--ws-accent) 6%, transparent);
+}
+
+/* Segmented control */
+.ws-segmented {
+  display: inline-flex;
+  background: var(--ws-whisper);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+.ws-segmented button {
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--foreground) 60%, transparent);
+  transition: all 160ms ease;
+}
+.ws-segmented button[data-active="true"] {
+  background: var(--ws-surface);
+  color: var(--foreground);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 0 0 1px color-mix(in srgb, var(--ws-accent) 8%, transparent);
+}
+
+/* Footer philosophy ticker */
+.ws-ticker {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}

@@ -1,0 +1,132 @@
+// WHITE Search — theme system
+// Eight variations of WHITE. Clean. Calm. Considered.
+
+import type { AccentName, Density, FontScale, WhiteTheme } from "@/lib/types";
+
+export interface ThemeDef {
+  id: WhiteTheme;
+  name: string;
+  swatch: string; // background color
+  surface: string; // card surface
+  whisper: string; // subtle tint for hover/muted
+  description: string;
+}
+
+export const THEMES: ThemeDef[] = [
+  {
+    id: "pure",
+    name: "Pure White",
+    swatch: "#ffffff",
+    surface: "#ffffff",
+    whisper: "#fafafa",
+    description: "The original. Absolute clarity. Nothing in the way.",
+  },
+  {
+    id: "ivory",
+    name: "Ivory",
+    swatch: "#fffff0",
+    surface: "#fffdf5",
+    whisper: "#f7f3e3",
+    description: "Warm paper. Easier on the eyes for long reading.",
+  },
+  {
+    id: "snow",
+    name: "Snow",
+    swatch: "#fffafa",
+    surface: "#fffefe",
+    whisper: "#fbeaea",
+    description: "A breath of crimson inside white. Soft, awake.",
+  },
+  {
+    id: "pearl",
+    name: "Pearl",
+    swatch: "#f8f8ff",
+    surface: "#fcfcff",
+    whisper: "#ececf7",
+    description: "Ghost white with a mineral glow.",
+  },
+  {
+    id: "alabaster",
+    name: "Alabaster",
+    swatch: "#fafafa",
+    surface: "#ffffff",
+    whisper: "#f0f0f0",
+    description: "Studio white. Neutral, professional, quiet.",
+  },
+  {
+    id: "ghost",
+    name: "Ghost",
+    swatch: "#f7f7f8",
+    surface: "#fbfbfc",
+    whisper: "#ededee",
+    description: "The faintest gray. Maximum focus, minimum glare.",
+  },
+  {
+    id: "seashell",
+    name: "Seashell",
+    swatch: "#fff5ee",
+    surface: "#fffaf3",
+    whisper: "#f3e6d5",
+    description: "Warm coastal light. Gentle, human.",
+  },
+  {
+    id: "mint",
+    name: "Mint Cream",
+    swatch: "#f5fffa",
+    surface: "#fafffc",
+    whisper: "#dcefdf",
+    description: "A whisper of green. Clean as morning air.",
+  },
+];
+
+export const THEME_MAP: Record<WhiteTheme, ThemeDef> = THEMES.reduce(
+  (acc, t) => ((acc[t.id] = t), acc),
+  {} as Record<WhiteTheme, ThemeDef>
+);
+
+export interface AccentDef {
+  id: AccentName;
+  name: string;
+  color: string; // hex used for the focus ring / active accent
+  soft: string; // soft background tint
+}
+
+export const ACCENTS: AccentDef[] = [
+  { id: "graphite", name: "Graphite", color: "#1a1a1a", soft: "rgba(26,26,26,0.06)" },
+  { id: "sage", name: "Sage", color: "#5a7a5a", soft: "rgba(90,122,90,0.08)" },
+  { id: "rose", name: "Rose", color: "#b56576", soft: "rgba(181,101,118,0.08)" },
+  { id: "amber", name: "Amber", color: "#b8860b", soft: "rgba(184,134,11,0.08)" },
+  { id: "slate", name: "Slate", color: "#475569", soft: "rgba(71,85,105,0.08)" },
+];
+
+export const ACCENT_MAP: Record<AccentName, AccentDef> = ACCENTS.reduce(
+  (acc, a) => ((acc[a.id] = a), acc),
+  {} as Record<AccentName, AccentDef>
+);
+
+export const DENSITY_PADDING: Record<Density, { card: string; gap: string; list: string }> = {
+  comfortable: { card: "p-5", gap: "gap-4", list: "gap-4" },
+  compact: { card: "p-3", gap: "gap-2", list: "gap-2" },
+  airy: { card: "p-7", gap: "gap-7", list: "gap-6" },
+};
+
+export const FONT_SCALE_CLASS: Record<FontScale, string> = {
+  small: "text-[13px]",
+  base: "text-[15px]",
+  large: "text-[17px]",
+};
+
+// Apply a theme + accent to :root as CSS custom properties.
+export function applyTheme(theme: WhiteTheme, accent: AccentName) {
+  if (typeof document === "undefined") return;
+  const t = THEME_MAP[theme];
+  const a = ACCENT_MAP[accent];
+  const root = document.documentElement;
+  root.style.setProperty("--ws-bg", t.swatch);
+  root.style.setProperty("--ws-surface", t.surface);
+  root.style.setProperty("--ws-whisper", t.whisper);
+  root.style.setProperty("--ws-accent", a.color);
+  root.style.setProperty("--ws-accent-soft", a.soft);
+  root.dataset.wsTheme = theme;
+  root.dataset.wsAccent = accent;
+}

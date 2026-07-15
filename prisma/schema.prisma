@@ -1,0 +1,79 @@
+// WHITE Search — Prisma Schema
+// Clean. Minimal. Of the People, By the People, For the People.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Search history — every query the user runs (for recall + Markov learning)
+model SearchHistory {
+  id        String   @id @default(cuid())
+  query     String
+  category  String   @default("web") // web | news | images | videos
+  resultsCount Int   @default(0)
+  clicked   Boolean  @default(false) // did the user open a result?
+  createdAt DateTime @default(now())
+
+  @@index([query])
+  @@index([createdAt])
+}
+
+// A click on a search result — feeds the Markov relevance model
+model SearchClick {
+  id        String   @id @default(cuid())
+  query     String
+  url       String
+  title     String
+  host      String
+  position  Int      // rank position clicked
+  category  String   @default("web")
+  createdAt DateTime @default(now())
+
+  @@index([query])
+  @@index([host])
+}
+
+// Markov chain node — a token (word) in the autocomplete graph
+model MarkovNode {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  frequency Int      @default(0) // how many times seen
+  startCount Int     @default(0) // how many times it starts a query
+  updatedAt DateTime @updatedAt
+}
+
+// Markov chain edge — transition from one token to the next
+model MarkovEdge {
+  id        String   @id @default(cuid())
+  fromToken String
+  toToken   String
+  weight    Int      @default(1) // transition frequency
+  updatedAt DateTime @updatedAt
+
+  @@unique([fromToken, toToken])
+  @@index([fromToken])
+  @@index([toToken])
+}
+
+// Persisted user preferences (theme + customization)
+// A single row keyed by an anonymous sessionId stored in a cookie
+model Preferences {
+  id            String   @id @default(cuid())
+  sessionId     String   @unique
+  theme         String   @default("pure") // pure | ivory | snow | pearl | alabaster | ghost | seashell | mint
+  density       String   @default("comfortable") // comfortable | compact | airy
+  fontScale     String   @default("base") // small | base | large
+  safeSearch    Boolean  @default(true)
+  openNewTab    Boolean  @default(true)
+  showFavicons  Boolean  @default(true)
+  markovEnabled Boolean  @default(true)
+  suggestionCount Int    @default(8)
+  accent        String   @default("graphite") // graphite | sage | rose | amber | slate
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
