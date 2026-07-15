@@ -15,7 +15,15 @@ async function getZai() {
 }
 
 // Simple in-memory cache (10 min)
-const cache = new Map<string, { data: unknown; at: number }>();
+interface PreviewCacheData {
+  url: string;
+  title: string;
+  publishedTime: string;
+  text: string;
+  wordCount: number;
+  truncated: boolean;
+}
+const cache = new Map<string, { data: PreviewCacheData; at: number }>();
 const TTL = 1000 * 60 * 10;
 
 function stripHtml(html: string): string {

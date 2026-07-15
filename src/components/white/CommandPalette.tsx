@@ -58,7 +58,6 @@ export function CommandPalette({ onSearch, onGoHome }: CommandPaletteProps) {
   const setPrefs = useWhite((s) => s.setPrefs);
   const prefs = useWhite((s) => s.prefs);
   const history = useWhite((s) => s.history);
-  const { toast } = useWhite.getState();
 
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);

@@ -34,9 +34,9 @@ export async function GET(req: NextRequest) {
     const sessionId = await getOrCreateSessionId();
 
     // Apply per-session domain rules: block removes, raise/lower re-sorts
-    const rules = await db.domainRule.findMany({ where: { sessionId } }).catch(() => []);
+    const rules = await db.domainRule.findMany({ where: { sessionId } }).catch(() => [] as { host: string; action: string }[]);
     if (rules.length > 0) {
-      const ruleMap = new Map(rules.map((r) => [r.host.replace(/^www\./, ""), r.action]));
+      const ruleMap = new Map(rules.map((r) => [r.host.replace(/^www\./, ""), r.action] as [string, string]));
       res.results = res.results.filter((r) => ruleMap.get(r.cleanHost) !== "block");
       const domainScore = (host: string) => {
         const a = ruleMap.get(host);

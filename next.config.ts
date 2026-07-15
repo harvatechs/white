@@ -2,11 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  /* config options here */
-  typescript: {
-    ignoreBuildErrors: true,
+  reactStrictMode: true,
+  // Allow large image domains for the image search feature
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "**" },
+    ],
   },
-  reactStrictMode: false,
 };
 
 export default nextConfig;

@@ -151,7 +151,7 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
     };
 
     const isLg = size === "lg";
-    const visible = open && (suggestions.length > 0 || (loading && value.trim()));
+    const visible = open && (suggestions.length > 0 || (loading && value.trim().length > 0));
     const hasValue = value.trim().length > 0;
 
     return (

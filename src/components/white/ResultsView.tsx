@@ -51,7 +51,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
     const [results, setResults] = useState<SearchResultItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [meta, setMeta] = useState<{ tookMs: number; total: number; cached: boolean } | null>(null);
+    const [meta, setMeta] = useState<{ tookMs: number; total: number; cached: boolean; hasMore?: boolean } | null>(null);
     const [instantAnswer, setInstantAnswer] = useState<InstantAnswerData | null>(null);
     const [related, setRelated] = useState<{ text: string; source: string }[]>([]);
     const [page, setPage] = useState(1);
@@ -128,7 +128,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
             setMeta(null);
           } else {
             setResults(data.results ?? []);
-            setMeta({ tookMs: data.tookMs, total: data.total, cached: data.cached });
+            setMeta({ tookMs: data.tookMs, total: data.total, cached: data.cached, hasMore: (data as { hasMore?: boolean }).hasMore });
           }
         }
       } catch {

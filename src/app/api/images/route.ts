@@ -89,37 +89,30 @@ export async function GET(req: NextRequest) {
     const allImages: ImageResult[] = [];
     const seenUrls = new Set<string>();
 
-    // Process top 5 search results in parallel
-    const pagesToRead = searchResults.slice(0, 5).filter((r) => r.url);
-    const pageResults = await Promise.allSettled(
-      pagesToRead.map(async (r) => {
-        try {
-          const pageData = (await zai.functions.invoke("page_reader", { url: r.url })) as {
-            data?: { html?: string; title?: string };
-          };
-          const html = pageData.data?.html ?? "";
-          const imgs = extractImageUrls(html, r.url!);
-          return imgs.map((img) => ({
-            url: img.url,
-            alt: img.alt,
-            source: r.host_name ?? "",
-            sourceUrl: r.url ?? "",
-            title: r.name ?? "",
-          }));
-        } catch {
-          return [];
-        }
-      })
-    );
-
-    for (const result of pageResults) {
-      if (result.status === "fulfilled") {
-        for (const img of result.value) {
+    // Process top 3 search results SEQUENTIALLY to avoid 429 rate limits
+    const pagesToRead = searchResults.slice(0, 3).filter((r) => r.url) as { url: string; name?: string; host_name?: string; snippet?: string }[];
+    for (const r of pagesToRead) {
+      if (allImages.length >= 24) break; // stop early if we have enough
+      try {
+        const pageData = (await zai.functions.invoke("page_reader", { url: r.url })) as {
+          data?: { html?: string; title?: string };
+        };
+        const html = pageData.data?.html ?? "";
+        const imgs = extractImageUrls(html, r.url);
+        for (const img of imgs) {
           if (!seenUrls.has(img.url)) {
             seenUrls.add(img.url);
-            allImages.push(img);
+            allImages.push({
+              url: img.url,
+              alt: img.alt,
+              source: r.host_name ?? "",
+              sourceUrl: r.url,
+              title: r.name ?? "",
+            });
           }
         }
+      } catch {
+        // best-effort — skip this page on error (likely 429)
       }
     }
 
