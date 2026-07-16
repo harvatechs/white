@@ -56,7 +56,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
     const [instantAnswer, setInstantAnswer] = useState<InstantAnswerData | null>(null);
     const [related, setRelated] = useState<{ text: string; source: string }[]>([]);
     const [page, setPage] = useState(1);
-    const pageSize = 10;
+    const pageSize = 15;
     const reqIdRef = useRef(0);
     const searchRef = useRef<SearchBoxHandle>(null);
 
@@ -407,21 +407,54 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
           ) : (
             <>
               <div className="mt-3 ws-hairline overflow-hidden rounded-2xl ws-surface">
-                <ResultList items={results} loading={loading} query={query} focusedIndex={focusedIndex} />
-              </div>
-              {/* Pagination */}
-              {!loading && meta && meta.total > pageSize && (
-                <Pagination
-                  page={page}
-                  total={meta.total}
-                  pageSize={pageSize}
+                <ResultList
+                  items={results}
                   loading={loading}
-                  onPageChange={(p) => {
-                    setPage(p);
-                    runSearch(query, category, undefined, p);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
+                  query={query}
+                  focusedIndex={focusedIndex}
+                  onTagClick={(tag) => handleSubmit(`${query} ${tag}`)}
                 />
+              </div>
+              {/* Pagination + Load More */}
+              {!loading && meta && meta.total > pageSize && (
+                <>
+                  <Pagination
+                    page={page}
+                    total={meta.total}
+                    pageSize={pageSize}
+                    loading={loading}
+                    onPageChange={(p) => {
+                      setPage(p);
+                      runSearch(query, category, undefined, p);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                  />
+                  {meta.hasMore && (
+                    <div className="flex justify-center py-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = page + 1;
+                          setPage(next);
+                          runSearch(query, category, undefined, next);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-xl ws-hairline px-5 py-2.5 text-[13px] font-medium hover:ws-whisper transition-colors"
+                      >
+                        Load more results
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+              {/* No "End of results" message — keep exploring */}
+              {!loading && meta && meta.total > 0 && (
+                <div className="py-4 text-center">
+                  <p className="text-[11px] text-foreground/30">
+                    Keep exploring — click{" "}
+                    <span style={{ color: "var(--ws-accent)" }} className="font-medium">HyperTags</span>
+                    {" "}below each result to go deeper.
+                  </p>
+                </div>
               )}
             </>
           )}

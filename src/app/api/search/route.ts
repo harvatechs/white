@@ -49,9 +49,8 @@ export async function GET(req: NextRequest) {
       searchQuery = searchQuery + (langNames[language] || "");
     }
 
-    // For page 1, only request what we need (faster SDK call).
-    // For later pages, request page * num (capped at 30) for pagination.
-    const fetchNum = page === 1 ? num : Math.min(page * num, 30);
+    // Always request the max (30) so we have plenty of results for pagination + infinite scroll
+    const fetchNum = 30;
     const res = await runSearch(searchQuery, category, fetchNum, recencyDays && recencyDays > 0 ? recencyDays : undefined);
 
     const sessionId = await getOrCreateSessionId();

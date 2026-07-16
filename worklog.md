@@ -848,3 +848,60 @@ Unresolved / Next-phase priorities:
 - Region filter uses `site:` operator which may not work with all search backends.
 - Could add stock price instant answer.
 - Could add unit conversion for more units (speed, data, volume).
+
+---
+Task ID: 15
+Agent: main (production + HyperTags + more results)
+Task: Make 100% production-ready, solve rate limits, increase results, add HyperTags, remove "End of results" message.
+
+Work Log:
+- Solved rate-limiting problems:
+  - Added exponential backoff retry (1s, 2s, 4s) for 429 errors — up to 3 retries.
+  - Extended cache TTL from 10 min → 30 min, stale fallback from 1 hour → 2 hours.
+  - Added `searchWithRetry()` function with intelligent retry logic.
+  - On rate-limit failure, returns stale cache instead of erroring.
+  - Request deduplication prevents duplicate concurrent searches.
+
+- Increased results from 10-15 to many more:
+  - Search API now always requests 30 results from the SDK (was 10-15).
+  - Added `searchExpanded()` function that runs expansion queries ("guide", "overview", "explained") to gather MORE results when the primary search doesn't return enough.
+  - Deduplicates results by URL to prevent duplicates from expansion queries.
+  - Page size increased from 10 → 15 per page.
+  - Added "Load more results" button for infinite scroll experience.
+  - Total results available: up to 30+ (with expansion queries).
+
+- Built HyperTag feature:
+  - New `HyperTags.tsx` component: small clickable keyword chips below each search result.
+  - `extractTags()` function extracts top 5 keywords from title + snippet using frequency analysis.
+  - Filters out stop words (the, this, that, with, etc.).
+  - Includes the domain name as a tag.
+  - Clicking a HyperTag searches "{original query} {tag}" — going deeper and wider.
+  - Tags have hover effects (ArrowUpRight icon appears, background tint).
+  - VLM-confirmed: "Keyword tags are visible below each search result. Design is clean."
+  - 71 HyperTags rendered across 15 results in testing.
+
+- Removed "End of clean results" message:
+  - Replaced with "Keep exploring — click HyperTags below each result to go deeper."
+  - Added "Load more results" button when hasMore is true.
+  - No more dead-end — users can always go deeper via HyperTags or pagination.
+
+- Fixed build error: `handleNewQuery` was not defined — changed to `handleSubmit`.
+- Verified:
+  - 15 results returned per page (was 10).
+  - 71 HyperTags across results.
+  - HyperTag click triggers new search (verified: "hello world hello").
+  - No "End of clean results" message.
+  - "Keep exploring" message shows.
+  - "Load more" button appears when hasMore.
+  - Instant answers work (42*17=714).
+  - No console errors, no runtime errors.
+  - Lint clean (0 errors, 0 warnings).
+  - Production build succeeds.
+
+Stage Summary:
+- Rate-limit handling: exponential backoff (3 retries), stale-while-revalidate (2hr fallback), 30min cache.
+- Results: up to 30+ per search (was 10-15), with expansion queries for more.
+- HyperTags: keyword chips below every result for deeper exploration (rabbit hole).
+- "End of clean results" removed — replaced with "Keep exploring" + Load More.
+- Page size: 15 per page (was 10).
+- Lint clean, build succeeds, all features verified.

@@ -8,15 +8,18 @@ import type { BookmarkItem, DomainAction, SearchResultItem } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { ResultPreview } from "./ResultPreview";
+import { HyperTags, extractTags } from "./HyperTags";
 
 interface ResultCardProps {
   item: SearchResultItem;
   index: number;
   query: string;
   focused?: boolean;
+  onTagClick?: (tag: string) => void;
 }
 
-export function ResultCard({ item, index, query, focused }: ResultCardProps) {
+export function ResultCard({ item, index, query, focused, onTagClick }: ResultCardProps) {
+  const tags = extractTags(item.name, item.snippet, item.cleanHost);
   const prefs = useWhite((s) => s.prefs);
   const isBookmarked = useWhite((s) => s.bookmarkUrls.has(item.url));
   const addBookmark = useWhite((s) => s.addBookmark);
@@ -209,6 +212,9 @@ export function ResultCard({ item, index, query, focused }: ResultCardProps) {
             </p>
           )}
 
+          {/* HyperTags — keyword chips for deeper exploration */}
+          <HyperTags tags={tags} onTagClick={onTagClick} />
+
           {/* action row: read + url */}
           <div className="mt-2.5 flex items-center gap-3">
             <button
@@ -394,11 +400,13 @@ export function ResultList({
   loading,
   query,
   focusedIndex,
+  onTagClick,
 }: {
   items: SearchResultItem[];
   loading: boolean;
   query: string;
   focusedIndex?: number;
+  onTagClick?: (tag: string) => void;
 }) {
   if (loading) {
     return (
@@ -415,13 +423,8 @@ export function ResultList({
   return (
     <div className="flex flex-col">
       {items.map((item, i) => (
-        <ResultCard key={item.id} item={item} index={i} query={query} focused={focusedIndex === i} />
+        <ResultCard key={item.id} item={item} index={i} query={query} focused={focusedIndex === i} onTagClick={onTagClick} />
       ))}
-      <div className="px-5 py-6 text-center">
-        <p className="text-xs text-foreground/40">
-          End of clean results. No infinite scroll. No sponsored content. No tracking.
-        </p>
-      </div>
     </div>
   );
 }
