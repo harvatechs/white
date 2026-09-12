@@ -16,6 +16,7 @@
 *No ads. No sponsors. No tracking. Powered by Markov chains and the open web.*  
 *Internet of the people, by the people, for the people.*
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-whitesearch.vercel.app-black?style=flat-square&logo=vercel)](https://whitesearch.vercel.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg?style=flat-square)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black.svg?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue.svg?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
@@ -23,7 +24,26 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ed.svg?style=flat-square&logo=docker)](Dockerfile)
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
 
+<br />
+
+### 🌐 [**Try WHITE Search Live &rarr; whitesearch.vercel.app**](https://whitesearch.vercel.app/)
+*Instant, ad-free, privacy-first search preview running in your browser.*
+
 </div>
+
+---
+
+> [!IMPORTANT]
+> ## 🚧 Public Alpha Stage — Under Active Construction
+> **WHITE Search is currently in public Alpha.**  
+> The core metasearch architecture, UI/UX, instant answer engines, and privacy algorithms are actively evolving with rapid continuous enhancements.
+> 
+> 🌍 **Official Stable Release (v1.0.0 Stable): Scheduled for Worldwide Public Launch in October 2026.**  
+> 
+> During this Alpha development phase:
+> - You can test the latest live deployment right now at [**whitesearch.vercel.app**](https://whitesearch.vercel.app/).
+> - We warmly welcome early adopters, bug hunters, and open-source contributors! Please see [CONTRIBUTING.md](CONTRIBUTING.md) to get involved.
+> - ⭐ **Star the repository** to track our roadmap and milestones on the journey toward the October 2026 worldwide launch!
 
 ---
 
@@ -86,7 +106,14 @@ Modern web search is broken. Results pages have devolved into walls of sponsored
 
 ## Quickstart
 
-### Option 1: Docker (Recommended for Self-Hosting)
+### Option 1: Live Web Demo (Instant Try)
+
+Experience WHITE Search instantly in your browser:  
+👉 **[https://whitesearch.vercel.app/](https://whitesearch.vercel.app/)**
+
+---
+
+### Option 2: Docker (Recommended for Self-Hosting)
 
 Run WHITE Search with Docker Compose in one command:
 
@@ -99,7 +126,7 @@ Your database and user rules are automatically persisted in `./db/custom.db`.
 
 ---
 
-### Option 2: Local Development
+### Option 3: Local Development
 
 #### Prerequisites
 - **Node.js**: v20.x or v22.x LTS (or **Bun** 1.1+)
@@ -109,8 +136,8 @@ Your database and user rules are automatically persisted in `./db/custom.db`.
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/white-search/white-search.git
-   cd white-search
+   git clone https://github.com/harvatechs/white.git
+   cd white
    ```
 
 2. **Install dependencies**:
@@ -248,7 +275,7 @@ graph TD
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `DATABASE_URL` | `file:../db/custom.db` | SQLite database file location |
+| `DATABASE_URL` | `file:../db/custom.db` | SQLite database file location (`file:/tmp/custom.db` on Vercel) |
 | `PORT` | `3000` | Port for the HTTP server |
 | `DEFAULT_SEARCH_PROVIDER` | `ddg` | Primary search provider (`ddg`, `searxng`, `local`) |
 | `SEARXNG_INSTANCE` | `https://searx.be` | Preferred SearXNG instance URL |
@@ -259,6 +286,11 @@ graph TD
 ---
 
 ## Public Deployment Guide
+
+### Deploy to Vercel (1-Click)
+1. Fork or import [harvatechs/white](https://github.com/harvatechs/white) to Vercel.
+2. Vercel automatically detects Next.js, installs dependencies with pnpm, and generates Prisma client binaries.
+3. Deploy! Live demo available at [whitesearch.vercel.app](https://whitesearch.vercel.app/).
 
 ### Deploy to Docker / VPS
 ```bash
@@ -272,12 +304,6 @@ docker run -d \
 
 ### Deploy to CapRover / Coolify
 Use the included `Dockerfile` and set persistent volume storage to `/app/db`.
-
-### Deploy to Vercel
-1. Fork this repository.
-2. Import the project in Vercel.
-3. Set `DATABASE_URL="file:/tmp/custom.db"` (or connect Turso / libSQL for persistent serverless SQLite).
-4. Deploy!
 
 ---
 
