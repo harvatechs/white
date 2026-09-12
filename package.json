@@ -6,7 +6,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build && node scripts/copy-standalone.mjs",
+    "build": "prisma generate && next build && node scripts/copy-standalone.mjs",
+    "postinstall": "prisma generate",
     "start": "node .next/standalone/server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

@@ -137,10 +137,19 @@ async function ensureTables(client: PrismaClient) {
   }
 }
 
+const isVercel = Boolean(process.env.VERCEL || process.env.NEXT_PUBLIC_VERCEL_ENV)
+const defaultDbUrl = isVercel ? 'file:/tmp/custom.db' : undefined
+const activeUrl = process.env.DATABASE_URL && (!isVercel || !process.env.DATABASE_URL.startsWith('file:') || process.env.DATABASE_URL.startsWith('file:/tmp'))
+  ? process.env.DATABASE_URL
+  : defaultDbUrl
+
 export const db =
   !globalForPrisma.__wsPrisma || globalForPrisma.__wsPrisma.version !== SCHEMA_VERSION
     ? (() => {
-        const client = new PrismaClient({ log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'] })
+        const client = new PrismaClient({
+          log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+          datasources: activeUrl ? { db: { url: activeUrl } } : undefined,
+        })
         
         if (!globalForPrisma.__wsDbInitPromise) {
           globalForPrisma.__wsDbInitPromise = ensureTables(client)
