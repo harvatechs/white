@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, ArrowRight, Sparkles, Clock, TrendingUp, CornerDownLeft } from "lucide-react";
+import { Search, X, ArrowRight, Sparkles, Clock, TrendingUp, CornerDownLeft, Zap, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWhite } from "@/lib/store";
+import { useToast } from "@/hooks/use-toast";
 import type { SuggestionItem } from "@/lib/types";
+import { parseBang, getMatchingBangs, type BangItem } from "@/lib/bangs";
 import { VoiceSearchButton } from "./VoiceSearchButton";
 
 export interface SearchBoxHandle {
@@ -41,6 +43,7 @@ function highlight(text: string, query: string) {
 
 export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
   ({ size = "md", autoFocus = false, onSubmit, className }, ref) => {
+    const { toast } = useToast();
     const value = useWhite((s) => s.query);
     const setValue = useWhite((s) => s.setQuery);
     const prefs = useWhite((s) => s.prefs);
@@ -52,6 +55,8 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
     const [open, setOpen] = useState(false);
     const [active, setActive] = useState(-1);
     const [focused, setFocused] = useState(false);
+    const [matchingBangs, setMatchingBangs] = useState<BangItem[]>([]);
+
     const inputRef = useRef<HTMLInputElement>(null);
     const boxRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,19 +109,46 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
       setValue(v);
       setActive(-1);
       if (debounceRef.current) clearTimeout(debounceRef.current);
+
       if (!v.trim()) {
         setSuggestions([]);
+        setMatchingBangs([]);
         setOpen(false);
         return;
       }
+
+      // Check if user is typing a bang (!...)
+      const customBangs = (prefs.customBangs as any) || [];
+      if (v.trim().startsWith("!")) {
+        const bangs = getMatchingBangs(v.trim(), customBangs, 8);
+        setMatchingBangs(bangs);
+      } else {
+        setMatchingBangs([]);
+      }
+
       setOpen(true);
-      // faster debounce for snappier autofill
       debounceRef.current = setTimeout(() => fetchSuggestions(v), 60);
     };
 
     const submit = (q: string) => {
       const trimmed = q.trim();
       if (!trimmed) return;
+
+      const customBangs = (prefs.customBangs as any) || [];
+      const bangRes = parseBang(trimmed, customBangs);
+
+      if (bangRes.hasBang && bangRes.targetUrl) {
+        setOpen(false);
+        setFocused(false);
+        inputRef.current?.blur();
+        toast({
+          title: `Direct to ${bangRes.bang?.name}`,
+          description: bangRes.cleanQuery ? `Searching for "${bangRes.cleanQuery}"` : `Opening ${bangRes.bang?.name}`,
+        });
+        window.open(bangRes.targetUrl, prefs.openNewTab ? "_blank" : "_self");
+        return;
+      }
+
       setOpen(false);
       setFocused(false);
       inputRef.current?.blur();
@@ -124,16 +156,23 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
     };
 
     const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      const totalOptions = matchingBangs.length > 0 ? matchingBangs.length : suggestions.length;
+
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setOpen(true);
-        setActive((a) => Math.min(a + 1, suggestions.length - 1));
+        setActive((a) => Math.min(a + 1, totalOptions - 1));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setActive((a) => Math.max(a - 1, -1));
       } else if (e.key === "Enter") {
         e.preventDefault();
-        if (active >= 0 && suggestions[active]) {
+        if (matchingBangs.length > 0 && active >= 0 && matchingBangs[active]) {
+          const bang = matchingBangs[active];
+          setValue(`!${bang.prefix} `);
+          setMatchingBangs([]);
+          inputRef.current?.focus();
+        } else if (active >= 0 && suggestions[active]) {
           submit(suggestions[active].text);
         } else {
           submit(value);
@@ -142,16 +181,21 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
         setOpen(false);
         setActive(-1);
         inputRef.current?.blur();
-      } else if (e.key === "Tab" && active >= 0 && suggestions[active]) {
-        // Tab autocompletes the selected suggestion into the input
-        e.preventDefault();
-        setValue(suggestions[active].text);
-        setActive(-1);
+      } else if (e.key === "Tab") {
+        if (matchingBangs.length > 0 && active >= 0 && matchingBangs[active]) {
+          e.preventDefault();
+          setValue(`!${matchingBangs[active].prefix} `);
+          setMatchingBangs([]);
+        } else if (active >= 0 && suggestions[active]) {
+          e.preventDefault();
+          setValue(suggestions[active].text);
+          setActive(-1);
+        }
       }
     };
 
     const isLg = size === "lg";
-    const visible = open && (suggestions.length > 0 || (loading && value.trim().length > 0));
+    const visible = open && (matchingBangs.length > 0 || suggestions.length > 0 || (loading && value.trim().length > 0));
     const hasValue = value.trim().length > 0;
 
     return (
@@ -185,7 +229,6 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
               setFocused(true);
               if (value.trim()) {
                 setOpen(true);
-                // Prefetch suggestions immediately on focus if not already loaded
                 if (suggestions.length === 0 && !loading) {
                   fetchSuggestions(value);
                 }
@@ -195,9 +238,9 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
             type="text"
             autoComplete="off"
             spellCheck={false}
-            placeholder={isLg ? "Search the open web" : "Search"}
+            placeholder={isLg ? "Search the open web (or type !w, !gh, !so...)" : "Search or type !"}
             className={cn(
-              "flex-1 bg-transparent outline-none placeholder:text-foreground/30 transition-colors",
+              "flex-1 bg-transparent outline-none placeholder:text-foreground/35 transition-colors",
               isLg ? "text-base sm:text-lg md:text-xl" : "text-sm sm:text-base"
             )}
             aria-label="Search query"
@@ -212,6 +255,7 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
               onClick={() => {
                 setValue("");
                 setSuggestions([]);
+                setMatchingBangs([]);
                 inputRef.current?.focus();
               }}
               className="shrink-0 rounded-full p-1 text-foreground/30 hover:text-foreground/60 transition-colors"
@@ -253,46 +297,92 @@ export const SearchBox = forwardRef<SearchBoxHandle, SearchBoxProps>(
               transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
               className="ws-surface absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-foreground/8 backdrop-blur-xl"
               style={{
-                background: "color-mix(in srgb, var(--ws-surface) 92%, transparent)",
+                background: "color-mix(in srgb, var(--ws-surface) 94%, transparent)",
                 boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)",
               }}
               role="listbox"
             >
-              {loading && suggestions.length === 0 && (
-                <div className="flex items-center gap-2.5 px-4 py-3 text-[13px] text-foreground/45">
-                  <Sparkles className="size-3.5 animate-pulse" style={{ color: "var(--ws-accent)" }} strokeWidth={1.75} />
-                  Thinking…
+              {/* BANGS AUTOCOMPLETE LIST */}
+              {matchingBangs.length > 0 && (
+                <div className="p-1.5 ws-hairline-b">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground/45">
+                    <Zap className="size-3" style={{ color: "var(--ws-accent)" }} />
+                    <span>Search Bangs (Direct Shortcuts)</span>
+                  </div>
+                  {matchingBangs.map((bang, i) => (
+                    <div
+                      key={bang.prefix}
+                      role="option"
+                      aria-selected={i === active}
+                      data-active={i === active}
+                      className="ws-suggestion-luxury flex items-center justify-between"
+                      onMouseEnter={() => setActive(i)}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setValue(`!${bang.prefix} `);
+                        setMatchingBangs([]);
+                        inputRef.current?.focus();
+                      }}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="font-mono text-[12.5px] font-bold px-1.5 py-0.5 rounded"
+                          style={{ background: "var(--ws-accent-soft)", color: "var(--ws-accent)" }}
+                        >
+                          !{bang.prefix}
+                        </span>
+                        <span className="text-[14px] font-medium truncate">{bang.name}</span>
+                      </div>
+                      <span className="text-[11.5px] text-foreground/40 uppercase tracking-wider">
+                        {bang.category}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
-              {suggestions.map((sug, i) => {
-                const Icon = SOURCE_ICON[sug.source] ?? Sparkles;
-                return (
-                  <div
-                    key={sug.text + i}
-                    role="option"
-                    aria-selected={i === active}
-                    data-active={i === active}
-                    className="ws-suggestion-luxury"
-                    onMouseEnter={() => setActive(i)}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      submit(sug.text);
-                    }}
-                  >
-                    <Icon
-                      className="size-4 shrink-0 transition-colors"
-                      style={{ color: i === active ? "var(--ws-accent)" : "color-mix(in srgb, var(--foreground) 35%, transparent)" }}
-                      strokeWidth={1.75}
-                    />
-                    <span className="flex-1 truncate text-[14px] sm:text-[15px]">
-                      {highlight(sug.text, value)}
-                    </span>
-                    {i === active && (
-                      <CornerDownLeft className="size-3 shrink-0 text-foreground/30" strokeWidth={1.75} />
-                    )}
-                  </div>
-                );
-              })}
+
+              {/* STANDARD SUGGESTIONS */}
+              {matchingBangs.length === 0 && (
+                <>
+                  {loading && suggestions.length === 0 && (
+                    <div className="flex items-center gap-2.5 px-4 py-3 text-[13px] text-foreground/45">
+                      <Sparkles className="size-3.5 animate-pulse" style={{ color: "var(--ws-accent)" }} strokeWidth={1.75} />
+                      Thinking…
+                    </div>
+                  )}
+                  {suggestions.map((sug, i) => {
+                    const Icon = SOURCE_ICON[sug.source] ?? Sparkles;
+                    return (
+                      <div
+                        key={sug.text + i}
+                        role="option"
+                        aria-selected={i === active}
+                        data-active={i === active}
+                        className="ws-suggestion-luxury"
+                        onMouseEnter={() => setActive(i)}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          submit(sug.text);
+                        }}
+                      >
+                        <Icon
+                          className="size-4 shrink-0 transition-colors"
+                          style={{
+                            color: i === active ? "var(--ws-accent)" : "color-mix(in srgb, var(--foreground) 35%, transparent)",
+                          }}
+                          strokeWidth={1.75}
+                        />
+                        <span className="flex-1 truncate text-[14px] sm:text-[15px]">
+                          {highlight(sug.text, value)}
+                        </span>
+                        {i === active && (
+                          <CornerDownLeft className="size-3 shrink-0 text-foreground/30" strokeWidth={1.75} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

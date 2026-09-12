@@ -10,38 +10,56 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
-  Sparkles,
-  FileText,
-  List,
+  Copy,
+  Check,
+  Download,
+  Volume2,
+  VolumeX,
+  Pause,
+  Play,
+  Type,
 } from "lucide-react";
 import { useWhite } from "@/lib/store";
 import type { SearchResultItem } from "@/lib/types";
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
+import ReactMarkdown from "react-markdown";
 
 interface ReadingPaneProps {
   items: SearchResultItem[];
   onNavigate: (item: SearchResultItem) => void;
 }
 
-type ViewMode = "article" | "summary";
-
 export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
   const preview = useWhite((s) => s.preview);
   const setPreview = useWhite((s) => s.setPreview);
 
-  const [view, setView] = useState<ViewMode>("article");
-  const [summary, setSummary] = useState<string | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [fontSize, setFontSize] = useState<"sm" | "base" | "lg">("base");
 
-  const close = useCallback(() => setPreview(null), [setPreview]);
+  // Browser-native Text-To-Speech (Web Speech API)
+  const [isPlayingTTS, setIsPlayingTTS] = useState(false);
+  const [speechRate, setSpeechRate] = useState<number>(1.0);
+  const synthRef = useRef<SpeechSynthesis | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // reset summary state when item changes
+  const close = useCallback(() => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+      setIsPlayingTTS(false);
+    }
+    setPreview(null);
+  }, [setPreview]);
+
+  // Stop speech on item change
   useEffect(() => {
-    setView("article");
-    setSummary(null);
-    setSummaryError(null);
-    setSummaryLoading(false);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      synthRef.current = window.speechSynthesis;
+    }
+    return () => {
+      if (synthRef.current) {
+        synthRef.current.cancel();
+      }
+    };
   }, [preview?.item?.url]);
 
   // load preview when item changes
@@ -49,13 +67,15 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
     if (!preview?.item) return;
     let active = true;
     const url = preview.item.url;
-    setPreview({ item: preview.item, data: null, loading: true, error: null });
+    setTimeout(() => {
+      if (active) setPreview({ item: preview.item, data: null, loading: true, error: null });
+    }, 0);
     (async () => {
       try {
         const r = await fetch(`/api/preview?url=${encodeURIComponent(url)}`);
         const d = await r.json();
         if (active) {
-          if (d.error) {
+          if (d.error && !d.isFallback) {
             setPreview({ item: preview.item, data: null, loading: false, error: d.error });
           } else {
             setPreview({ item: preview.item, data: d, loading: false, error: null });
@@ -89,35 +109,58 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
       } else if (e.key === "Escape") {
         e.preventDefault();
         close();
-      } else if (e.key === "s" && !preview.loading && preview.data) {
-        e.preventDefault();
-        if (!summary && !summaryLoading) fetchSummary();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [preview, items, onNavigate, close, summary, summaryLoading]);
+  }, [preview, items, onNavigate, close]);
 
-  const fetchSummary = async () => {
-    if (!preview?.item || summaryLoading) return;
-    setSummaryLoading(true);
-    setSummaryError(null);
-    setView("summary");
-    try {
-      const r = await fetch(`/api/summarize?url=${encodeURIComponent(preview.item.url)}`);
-      const d = await r.json();
-      if (d.error) {
-        setSummaryError(d.error);
-        setSummary(null);
-      } else {
-        setSummary(d.summary);
-      }
-    } catch {
-      setSummaryError("Failed to generate summary.");
-    } finally {
-      setSummaryLoading(false);
+  const toggleSpeech = () => {
+    if (!synthRef.current || !preview?.data?.text) return;
+
+    if (isPlayingTTS) {
+      synthRef.current.cancel();
+      setIsPlayingTTS(false);
+      return;
     }
+
+    synthRef.current.cancel();
+    const cleanText = preview.data.text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = speechRate;
+    utterance.onend = () => setIsPlayingTTS(false);
+    utterance.onerror = () => setIsPlayingTTS(false);
+    utteranceRef.current = utterance;
+    synthRef.current.speak(utterance);
+    setIsPlayingTTS(true);
   };
+
+  const handleCopyMarkdown = () => {
+    if (!preview?.data?.text) return;
+    const md = `# ${preview.data.title || preview.item?.name}\n\nSource: ${preview.item?.url}\n\n${preview.data.text}`;
+    navigator.clipboard.writeText(md).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleDownload = () => {
+    if (!preview?.data?.text) return;
+    const md = `# ${preview.data.title || preview.item?.name}\n\nSource: ${preview.item?.url}\n\n${preview.data.text}`;
+    const blob = new Blob([md], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(preview.data.title || "article").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const fontSizeClass = {
+    sm: "text-[14px] leading-[1.65]",
+    base: "text-[15.5px] leading-[1.8]",
+    lg: "text-[17.5px] leading-[1.9]",
+  }[fontSize];
 
   return (
     <AnimatePresence>
@@ -129,7 +172,7 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-black/20 backdrop-blur-[2px]"
+            className="fixed inset-0 z-50 bg-black/25 backdrop-blur-[2px]"
             onClick={close}
           />
           {/* pane */}
@@ -138,8 +181,8 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 360, damping: 38 }}
-            className="fixed right-0 top-0 z-50 flex h-[100dvh] w-full max-w-[640px] flex-col ws-surface ws-hairline-l shadow-2xl"
-            style={{ borderLeft: "1px solid color-mix(in srgb, var(--ws-accent) 8%, transparent)" }}
+            className="fixed right-0 top-0 z-50 flex h-[100dvh] w-full max-w-[680px] flex-col ws-surface ws-hairline-l shadow-2xl"
+            style={{ borderLeft: "1px solid color-mix(in srgb, var(--ws-accent) 10%, transparent)" }}
             role="dialog"
             aria-label="Reading preview"
           >
@@ -197,55 +240,119 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
               </button>
             </header>
 
-            {/* view toggle (article / summary) */}
+            {/* Reader Controls Toolbar */}
             {!preview.loading && preview.data && (
-              <div className="flex items-center gap-1 px-5 py-2 ws-hairline-b">
-                <div className="ws-segmented">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2 ws-hairline-b bg-muted/20">
+                <div className="flex items-center gap-2">
+                  {/* Browser TTS Button */}
                   <button
                     type="button"
-                    data-active={view === "article"}
-                    onClick={() => setView("article")}
-                    className="inline-flex items-center gap-1.5"
+                    onClick={toggleSpeech}
+                    className="inline-flex items-center gap-1.5 rounded-md ws-hairline px-2.5 py-1 text-[11.5px] font-medium hover:ws-whisper transition-colors"
+                    title={isPlayingTTS ? "Pause Reading Aloud" : "Read Aloud (Browser Voice)"}
                   >
-                    <FileText className="size-3.5" strokeWidth={1.75} />
-                    Article
+                    {isPlayingTTS ? (
+                      <>
+                        <Pause className="size-3.5" style={{ color: "var(--ws-accent)" }} />
+                        <span style={{ color: "var(--ws-accent)" }}>Pause Audio</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="size-3.5 text-foreground/60" />
+                        <span>Read Aloud</span>
+                      </>
+                    )}
                   </button>
+
+                  {/* Speech Rate Cycle */}
+                  {isPlayingTTS && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rates = [1.0, 1.25, 1.5, 2.0];
+                        const nextRate = rates[(rates.indexOf(speechRate) + 1) % rates.length];
+                        setSpeechRate(nextRate);
+                        if (utteranceRef.current && synthRef.current) {
+                          toggleSpeech();
+                          setTimeout(toggleSpeech, 50);
+                        }
+                      }}
+                      className="rounded-md ws-hairline px-2 py-1 text-[11px] font-mono hover:ws-whisper"
+                    >
+                      {speechRate}x
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {/* Font Size Selector */}
+                  <div className="inline-flex items-center rounded-md ws-hairline p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setFontSize("sm")}
+                      className={`px-1.5 py-0.5 text-[11px] rounded ${fontSize === "sm" ? "bg-foreground/10 font-bold" : "text-foreground/50"}`}
+                      title="Small font"
+                    >
+                      A
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFontSize("base")}
+                      className={`px-1.5 py-0.5 text-[12px] rounded ${fontSize === "base" ? "bg-foreground/10 font-bold" : "text-foreground/50"}`}
+                      title="Default font"
+                    >
+                      A
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFontSize("lg")}
+                      className={`px-1.5 py-0.5 text-[13px] rounded ${fontSize === "lg" ? "bg-foreground/10 font-bold" : "text-foreground/50"}`}
+                      title="Large font"
+                    >
+                      A
+                    </button>
+                  </div>
+
+                  {/* Copy Markdown */}
                   <button
                     type="button"
-                    data-active={view === "summary"}
-                    onClick={() => {
-                      if (!summary && !summaryLoading) fetchSummary();
-                      setView("summary");
-                    }}
-                    className="inline-flex items-center gap-1.5"
+                    onClick={handleCopyMarkdown}
+                    className="inline-flex items-center gap-1 rounded-md ws-hairline px-2 py-1 text-[11.5px] hover:ws-whisper transition-colors"
+                    title="Copy article as Markdown"
                   >
-                    <Sparkles className="size-3.5" strokeWidth={1.75} />
-                    Summary
+                    {copied ? <Check className="size-3 text-green-600" /> : <Copy className="size-3 text-foreground/60" />}
+                    <span>{copied ? "Copied" : "Copy"}</span>
+                  </button>
+
+                  {/* Download Markdown */}
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    className="inline-flex items-center gap-1 rounded-md ws-hairline px-2 py-1 text-[11.5px] hover:ws-whisper transition-colors"
+                    title="Download as .md"
+                  >
+                    <Download className="size-3 text-foreground/60" />
+                    <span>Download</span>
                   </button>
                 </div>
-                {summary && view === "summary" && (
-                  <span className="ml-auto ws-pill" style={{ opacity: 0.6 }}>
-                    <List className="size-3" /> AI-generated
-                  </span>
-                )}
               </div>
             )}
 
             {/* body */}
-            <div className="ws-scroll flex-1 overflow-y-auto px-6 py-6">
+            <div className="ws-scroll flex-1 overflow-y-auto px-7 py-6">
               {preview.loading && (
                 <div className="flex flex-col items-center justify-center py-20 text-foreground/40">
                   <Loader2 className="size-6 animate-spin mb-3" style={{ color: "var(--ws-accent)" }} />
-                  <p className="text-[13px]">Reading the page…</p>
+                  <p className="text-[13px]">Extracting distraction-free reading view…</p>
                 </div>
               )}
 
               {!preview.loading && preview.error && (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
                   <AlertCircle className="size-7 mb-3" style={{ color: "var(--destructive)" }} strokeWidth={1.5} />
-                  <p className="text-[14px] font-medium">Couldn&rsquo;t fetch a clean preview</p>
-                  <p className="mt-1 max-w-[300px] text-[12.5px] text-foreground/50">
-                    Some sites block readers or require JavaScript. You can still open the original page.
+                  <p className="text-[14px] font-medium">Couldn&rsquo;t fetch reading preview</p>
+                  <p className="mt-1 max-w-[320px] text-[12.5px] text-foreground/50">
+                    This website may block automated readers or rely on complex client-side scripts.
                   </p>
                   <a
                     href={preview.item?.url}
@@ -254,40 +361,46 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
                     className="mt-4 inline-flex items-center gap-1.5 rounded-lg ws-hairline px-3 py-2 text-[12.5px] font-medium hover:ws-whisper transition-colors"
                   >
                     <ExternalLink className="size-3.5" strokeWidth={1.75} />
-                    Open original
+                    Open original site
                   </a>
                 </div>
               )}
 
               {/* ARTICLE VIEW */}
-              {!preview.loading && preview.data && view === "article" && (
+              {!preview.loading && preview.data && (
                 <article className="ws-fade-up">
-                  <h1 className="text-[22px] font-semibold leading-tight tracking-tight">
+                  <h1 className="text-[24px] font-bold leading-tight tracking-tight text-foreground/90">
                     {preview.data.title || preview.item?.name}
                   </h1>
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-[12px] text-foreground/45">
-                    <span>{preview.item?.cleanHost}</span>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-3 text-[12px] text-foreground/50 pb-4 ws-hairline-b">
+                    <span className="font-medium text-foreground/70">{preview.item?.cleanHost}</span>
                     {preview.data.publishedTime && (
                       <>
                         <span className="text-foreground/25">·</span>
                         <span className="inline-flex items-center gap-1">
                           <Clock className="size-3" strokeWidth={1.75} />
-                          {new Date(preview.data.publishedTime).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+                          {new Date(preview.data.publishedTime).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
                         </span>
                       </>
                     )}
                     <span className="text-foreground/25">·</span>
                     <span>{preview.data.wordCount.toLocaleString()} words</span>
+                    <span className="text-foreground/25">·</span>
+                    <span>~{Math.max(1, Math.ceil(preview.data.wordCount / 200))} min read</span>
                   </div>
 
-                  <div className="mt-5 whitespace-pre-wrap break-words text-[15px] leading-[1.8] text-foreground/80">
-                    {preview.data.text}
+                  <div className={`mt-6 ${fontSizeClass} text-foreground/80 prose dark:prose-invert max-w-none`}>
+                    <ReactMarkdown>{preview.data.text}</ReactMarkdown>
                   </div>
 
                   {preview.data.truncated && (
-                    <div className="mt-6 rounded-xl ws-whisper p-4 text-center">
+                    <div className="mt-8 rounded-xl ws-whisper p-4 text-center">
                       <p className="text-[12.5px] text-foreground/50">
-                        Preview truncated for reading.{" "}
+                        Article excerpt formatted for clean reading.{" "}
                         <a
                           href={preview.item?.url}
                           target="_blank"
@@ -295,104 +408,18 @@ export function ReadingPane({ items, onNavigate }: ReadingPaneProps) {
                           className="font-medium underline underline-offset-2"
                           style={{ color: "var(--ws-accent)" }}
                         >
-                          Open the full page →
+                          Visit original web page →
                         </a>
                       </p>
                     </div>
                   )}
                 </article>
               )}
-
-              {/* SUMMARY VIEW */}
-              {!preview.loading && preview.data && view === "summary" && (
-                <div className="ws-fade-up">
-                  {summaryLoading && (
-                    <div className="flex flex-col items-center justify-center py-16">
-                      <Loader2 className="size-6 animate-spin mb-3" style={{ color: "var(--ws-accent)" }} />
-                      <p className="text-[13px] text-foreground/50">Generating a clean summary…</p>
-                      <p className="mt-1 text-[11px] text-foreground/35">Powered by WHITE&rsquo;s LLM · no tracking</p>
-                    </div>
-                  )}
-
-                  {!summaryLoading && summaryError && (
-                    <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <AlertCircle className="size-7 mb-3" style={{ color: "var(--destructive)" }} strokeWidth={1.5} />
-                      <p className="text-[14px] font-medium">Couldn&rsquo;t summarize this page</p>
-                      <p className="mt-1 text-[12.5px] text-foreground/50">{summaryError}</p>
-                      <button
-                        type="button"
-                        onClick={fetchSummary}
-                        className="mt-4 inline-flex items-center gap-1.5 rounded-lg ws-hairline px-3 py-2 text-[12.5px] font-medium hover:ws-whisper transition-colors"
-                      >
-                        <Sparkles className="size-3.5" strokeWidth={1.75} />
-                        Try again
-                      </button>
-                    </div>
-                  )}
-
-                  {!summaryLoading && summary && (
-                    <>
-                      <div
-                        className="mb-5 rounded-2xl p-5"
-                        style={{ background: "var(--ws-accent-soft)" }}
-                      >
-                        <div className="mb-3 flex items-center gap-2">
-                          <Sparkles className="size-4" style={{ color: "var(--ws-accent)" }} strokeWidth={1.75} />
-                          <h3 className="text-[12px] font-semibold uppercase tracking-[0.1em]" style={{ color: "var(--ws-accent)" }}>
-                            Clean Summary
-                          </h3>
-                        </div>
-                        <div className="text-[14.5px] leading-[1.7] text-foreground/85 whitespace-pre-wrap">
-                          {summary}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between rounded-xl ws-hairline p-3">
-                        <p className="text-[11.5px] text-foreground/45">
-                          Summary of <span className="font-medium">{preview.item?.cleanHost}</span> · {preview.data.wordCount.toLocaleString()} words condensed
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setView("article")}
-                          className="inline-flex items-center gap-1 text-[12px] font-medium hover:underline"
-                          style={{ color: "var(--ws-accent)" }}
-                        >
-                          <FileText className="size-3.5" strokeWidth={1.75} />
-                          Read full
-                        </button>
-                      </div>
-                    </>
-                  )}
-
-                  {!summaryLoading && !summary && !summaryError && (
-                    <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <div
-                        className="mb-4 flex size-12 items-center justify-center rounded-2xl"
-                        style={{ background: "var(--ws-accent-soft)" }}
-                      >
-                        <Sparkles className="size-6" style={{ color: "var(--ws-accent)" }} strokeWidth={1.5} />
-                      </div>
-                      <p className="text-[14px] font-medium">Get a clean summary</p>
-                      <p className="mt-1 max-w-[280px] text-[12.5px] text-foreground/50">
-                        WHITE&rsquo;s LLM will condense this page into 3-5 bullet points. No tracking, no storage — the summary is generated on demand.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={fetchSummary}
-                        className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-medium transition-colors"
-                        style={{ background: "var(--ws-accent)", color: "#fff" }}
-                      >
-                        <Sparkles className="size-4" strokeWidth={1.75} />
-                        Summarize
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* footer hint */}
-            <footer className="ws-hairline-t px-5 py-2.5 text-center text-[11px] text-foreground/35">
-              <kbd>j</kbd> / <kbd>k</kbd> navigate · <kbd>s</kbd> summarize · <kbd>Esc</kbd> close
+            <footer className="ws-hairline-t px-5 py-2.5 text-center text-[11px] text-foreground/40">
+              <kbd>j</kbd> / <kbd>k</kbd> navigate · <kbd>Esc</kbd> close · 100% Client-side reader
             </footer>
           </motion.aside>
         </>

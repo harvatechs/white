@@ -36,6 +36,15 @@ export const DEFAULT_PREFS: UserPreferences = {
   accent: "graphite",
   customAccent: null,
   searchAlgorithm: "relevance",
+  searchProvider: "ddg",
+  searxngInstance: "https://searx.be",
+  localFirst: true,
+  weightRecency: 0,
+  weightDiversity: 0,
+  weightPersonal: 0,
+  spamFilter: true,
+  customBangs: [],
+  customSpamDomains: [],
 };
 
 interface WhiteStore {
@@ -62,6 +71,7 @@ interface WhiteStore {
   showStats: boolean;
   showCommand: boolean;
   showHistory: boolean;
+  showSync: boolean;
   // Reading Mode
   preview: { item: SearchResultItem; data: PreviewData | null; loading: boolean; error: string | null } | null;
   // j/k navigation
@@ -94,6 +104,7 @@ interface WhiteStore {
   setShowStats: (b: boolean) => void;
   setShowCommand: (b: boolean) => void;
   setShowHistory: (b: boolean) => void;
+  setShowSync: (b: boolean) => void;
   setDomainRules: (r: DomainRule[]) => void;
   setDomainRule: (host: string, action: DomainAction) => void;
   removeDomainRule: (host: string) => void;
@@ -130,6 +141,7 @@ export const useWhite = create<WhiteStore>((set, get) => ({
   showStats: false,
   showCommand: false,
   showHistory: false,
+  showSync: false,
   preview: null,
   focusedIndex: -1,
   timeRange: "all" as TimeRange,
@@ -171,6 +183,7 @@ export const useWhite = create<WhiteStore>((set, get) => ({
   setShowStats: (b) => set({ showStats: b }),
   setShowCommand: (b) => set({ showCommand: b }),
   setShowHistory: (b) => set({ showHistory: b }),
+  setShowSync: (b) => set({ showSync: b }),
   setDomainRules: (r) =>
     set({
       domainRules: r,

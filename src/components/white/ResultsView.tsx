@@ -50,6 +50,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
     const setTimeRange = useWhite((s) => s.setTimeRange);
 
     const [results, setResults] = useState<SearchResultItem[]>([]);
+    const [localResults, setLocalResults] = useState<SearchResultItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [meta, setMeta] = useState<{ tookMs: number; total: number; cached: boolean; hasMore?: boolean } | null>(null);
@@ -106,8 +107,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
     const filterRegion = useWhite((s) => s.filterRegion);
     const filterLanguage = useWhite((s) => s.filterLanguage);
 
-    // Client-side result cache for instant back/forward navigation
-    const cacheRef = useRef<Map<string, { results: SearchResultItem[]; meta: { tookMs: number; total: number; cached: boolean; hasMore?: boolean } | null }>>(new Map());
+    const cacheRef = useRef<Map<string, { results: SearchResultItem[]; localResults: SearchResultItem[]; meta: { tookMs: number; total: number; cached: boolean; hasMore?: boolean } | null }>>(new Map());
 
     const runSearch = useCallback(async (q: string, c: SearchCategory, r?: TimeRange, p?: number) => {
       if (!q.trim()) return;
@@ -119,6 +119,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       const cached = cacheRef.current.get(cacheKey);
       if (cached) {
         setResults(cached.results);
+        setLocalResults(cached.localResults ?? []);
         setMeta(cached.meta);
         setLoading(false);
         setError(null);
@@ -127,6 +128,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       }
       setLoading(true);
       setError(null);
+      setLocalResults([]);
       setFocusedIndex(-1);
       const myReq = ++reqIdRef.current;
       const days = range === "all" ? "" : `&r=${TIME_RANGE_DAYS[range]}`;
@@ -136,7 +138,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
       const langParam = filterLanguage !== "all" ? `&lang=${filterLanguage}` : "";
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&c=${c}${pageParam}${days}${algoParam}${regionParam}${langParam}`);
-        const data = (await res.json()) as SearchResponse & { error?: string; hasMore?: boolean };
+        const data = (await res.json()) as SearchResponse & { error?: string; hasMore?: boolean; localResults?: SearchResultItem[] };
         if (myReq === reqIdRef.current) {
           if (!res.ok && data.error) {
             setError(
@@ -145,14 +147,17 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
                 : "Something went wrong. Please try again."
             );
             setResults([]);
+            setLocalResults([]);
             setMeta(null);
           } else {
             const newResults = data.results ?? [];
+            const newLocalResults = data.localResults ?? [];
             const newMeta = { tookMs: data.tookMs, total: data.total, cached: data.cached, hasMore: data.hasMore };
             setResults(newResults);
+            setLocalResults(newLocalResults);
             setMeta(newMeta);
             // Store in client cache (limit to 20 entries)
-            cacheRef.current.set(cacheKey, { results: newResults, meta: newMeta });
+            cacheRef.current.set(cacheKey, { results: newResults, localResults: newLocalResults, meta: newMeta });
             if (cacheRef.current.size > 20) {
               const firstKey = cacheRef.current.keys().next().value;
               if (firstKey) cacheRef.current.delete(firstKey);
@@ -163,6 +168,7 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
         if (myReq === reqIdRef.current) {
           setError("Network error. Please check your connection and try again.");
           setResults([]);
+          setLocalResults([]);
         }
       } finally {
         if (myReq === reqIdRef.current) setLoading(false);
@@ -365,6 +371,15 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
                     {prefs.searchAlgorithm}
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => useWhite.getState().setShowSettings(true)}
+                  className="ws-pill transition-opacity hover:opacity-100"
+                  style={{ opacity: 0.85, cursor: "pointer" }}
+                  title="Change search engine"
+                >
+                  <span className="font-medium">{prefs.searchProvider === "local" ? "Local Engine" : prefs.searchProvider === "ddg" ? "DuckDuckGo" : "SearXNG"}</span>
+                </button>
                 {focusedIndex >= 0 && (
                   <span className="ml-1 text-foreground/35">
                     <kbd className="mr-1">{focusedIndex + 1}</kbd>· <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>Enter</kbd> read · <kbd>o</kbd> open
@@ -406,6 +421,24 @@ export const ResultsView = forwardRef<ResultsViewHandle, ResultsViewProps>(
             </div>
           ) : (
             <>
+              {localResults.length > 0 && (
+                <div className="mt-3">
+                  <div className="flex items-center gap-1.5 mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-foreground/45">
+                    <Bookmark className="size-3" style={{ color: "var(--ws-accent)" }} />
+                    <span>From your Bookmarks & History</span>
+                  </div>
+                  <div className="ws-hairline overflow-hidden rounded-2xl ws-surface mb-5" style={{ borderColor: "color-mix(in srgb, var(--ws-accent) 20%, transparent)" }}>
+                    <ResultList
+                      items={localResults}
+                      loading={false}
+                      query={query}
+                      focusedIndex={-99}
+                      onTagClick={(tag) => handleSubmit(`${query} ${tag}`)}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="mt-3 ws-hairline overflow-hidden rounded-2xl ws-surface">
                 <ResultList
                   items={results}

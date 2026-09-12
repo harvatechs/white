@@ -11,8 +11,11 @@ const SESSION_COOKIE = "ws_session";
 export async function getOrCreateSessionId(): Promise<string> {
   const store = await cookies();
   const existing = store.get(SESSION_COOKIE)?.value;
-  if (existing) return existing;
-  return `ws_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  // Validate token shape to prevent header injection or corrupted cookie IDs
+  if (existing && /^[a-zA-Z0-9_-]{8,64}$/.test(existing)) {
+    return existing;
+  }
+  return `ws_${crypto.randomUUID().replace(/-/g, "")}`;
 }
 
 // Helper: attach the session cookie to a NextResponse so the browser persists it

@@ -27,54 +27,62 @@ export function tokenize(query: string): string[] {
 }
 
 // Teach the chain from a new query
+const queryQueue: string[] = [];
+let isProcessingQueue = false;
+
 export async function learnQuery(query: string): Promise<void> {
-  const tokens = tokenize(query);
-  if (tokens.length === 0) return;
+  const trimmed = query.trim();
+  if (!trimmed || trimmed.length > 200) return;
+  queryQueue.push(trimmed);
+
+  if (!isProcessingQueue) {
+    processQueue().catch((err) => console.error("[markov] queue process error:", err));
+  }
+}
+
+async function processQueue(): Promise<void> {
+  if (isProcessingQueue) return;
+  isProcessingQueue = true;
 
   try {
-    // mark start token
-    await upsertNode(tokens[0], 1, 1);
-    for (let i = 1; i < tokens.length; i++) {
-      await upsertNode(tokens[i], 1, 0);
-      await upsertEdge(tokens[i - 1], tokens[i]);
-    }
-    if (tokens.length === 1) {
-      // single-token query already counted via upsertNode above
-    }
-  } catch (e) {
-    // learning must never break search
-    console.error("[markov] learnQuery error:", e);
-  }
-}
+    while (queryQueue.length > 0) {
+      const batch = queryQueue.splice(0, 10);
+      for (const q of batch) {
+        const tokens = tokenize(q);
+        if (tokens.length === 0) continue;
 
-async function upsertNode(token: string, freqInc: number, startInc: number) {
-  const existing = await db.markovNode.findUnique({ where: { token } });
-  if (existing) {
-    await db.markovNode.update({
-      where: { token },
-      data: {
-        frequency: { increment: freqInc },
-        startCount: { increment: startInc },
-      },
-    });
-  } else {
-    await db.markovNode.create({
-      data: { token, frequency: freqInc, startCount: startInc },
-    });
-  }
-}
+        try {
+          await db.$transaction(async (tx) => {
+            // Upsert start token
+            await tx.markovNode.upsert({
+              where: { token: tokens[0] },
+              update: { frequency: { increment: 1 }, startCount: { increment: 1 } },
+              create: { token: tokens[0], frequency: 1, startCount: 1 },
+            });
 
-async function upsertEdge(from: string, to: string) {
-  const existing = await db.markovEdge.findUnique({
-    where: { fromToken_toToken: { fromToken: from, toToken: to } },
-  });
-  if (existing) {
-    await db.markovEdge.update({
-      where: { fromToken_toToken: { fromToken: from, toToken: to } },
-      data: { weight: { increment: 1 } },
-    });
-  } else {
-    await db.markovEdge.create({ data: { fromToken: from, toToken: to, weight: 1 } });
+            // Upsert remaining tokens and bigram edges
+            for (let i = 1; i < tokens.length; i++) {
+              await tx.markovNode.upsert({
+                where: { token: tokens[i] },
+                update: { frequency: { increment: 1 } },
+                create: { token: tokens[i], frequency: 1, startCount: 0 },
+              });
+
+              await tx.markovEdge.upsert({
+                where: { fromToken_toToken: { fromToken: tokens[i - 1], toToken: tokens[i] } },
+                update: { weight: { increment: 1 } },
+                create: { fromToken: tokens[i - 1], toToken: tokens[i], weight: 1 },
+              });
+            }
+          });
+        } catch (e) {
+          // Non-fatal — learning must never throw or break search
+          console.warn("[markov] transaction error:", e);
+        }
+      }
+    }
+  } finally {
+    isProcessingQueue = false;
   }
 }
 

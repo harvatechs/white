@@ -7,17 +7,12 @@
 //   - currency-ish: "1 usd in eur" (static rates fallback)
 // If nothing matches, returns { answer: null } so the client shows normal results.
 import { NextRequest, NextResponse } from "next/server";
-import ZAI from "z-ai-web-dev-sdk";
+import { fetchOpenWeather, fetchOpenCurrency, fetchOpenDefinition } from "@/lib/open-apis";
+import { searchRateLimiter, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 20;
-
-let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
-async function getZai() {
-  if (!zaiInstance) zaiInstance = await ZAI.create();
-  return zaiInstance;
-}
 
 interface InstantAnswer {
   kind: "math" | "unit" | "time" | "definition" | "calc" | "weather" | "currency";
@@ -26,47 +21,220 @@ interface InstantAnswer {
   detail?: string;
 }
 
-// --- Math evaluation (safe-ish: only allow numbers, operators, parens, Math funcs) ---
+// --- Safe Math Evaluator (Deterministic AST & Recursive Descent — Zero eval/Function) ---
+class SafeMathEvaluator {
+  private pos = 0;
+  private tokens: string[] = [];
+
+  private tokenize(str: string): string[] | null {
+    const rawTokens: string[] = [];
+    let i = 0;
+    const len = str.length;
+
+    while (i < len) {
+      const ch = str[i];
+      if (/\s/.test(ch)) {
+        i++;
+        continue;
+      }
+
+      // Numbers (integers or decimals)
+      if (/\d/.test(ch) || (ch === "." && i + 1 < len && /\d/.test(str[i + 1]))) {
+        let numStr = "";
+        while (i < len && (/[\d.]/.test(str[i]))) {
+          numStr += str[i];
+          i++;
+        }
+        rawTokens.push(numStr);
+        continue;
+      }
+
+      // Operators and parens
+      if ("+-*/%^(),".includes(ch)) {
+        rawTokens.push(ch);
+        i++;
+        continue;
+      }
+
+      // Named functions or constants (letters only)
+      if (/[a-zA-Z]/.test(ch)) {
+        let word = "";
+        while (i < len && /[a-zA-Z]/.test(str[i])) {
+          word += str[i].toLowerCase();
+          i++;
+        }
+        const allowedWords = new Set([
+          "sqrt", "sin", "cos", "tan", "abs", "round", "floor", "ceil", "log", "min", "max", "pi", "e"
+        ]);
+        if (!allowedWords.has(word)) return null; // Reject any unknown identifier
+        rawTokens.push(word);
+        continue;
+      }
+
+      // Unknown character -> reject
+      return null;
+    }
+    return rawTokens;
+  }
+
+  private peek(): string | null {
+    return this.pos < this.tokens.length ? this.tokens[this.pos] : null;
+  }
+
+  private consume(expected?: string): string {
+    const tok = this.tokens[this.pos++];
+    if (expected && tok !== expected) {
+      throw new Error(`Expected ${expected}, got ${tok}`);
+    }
+    return tok;
+  }
+
+  private parsePrimary(): number {
+    const tok = this.peek();
+    if (!tok) throw new Error("Unexpected end of expression");
+
+    if (tok === "(") {
+      this.consume("(");
+      const val = this.parseExpr();
+      this.consume(")");
+      return val;
+    }
+
+    if (tok === "pi") {
+      this.consume("pi");
+      return Math.PI;
+    }
+    if (tok === "e") {
+      this.consume("e");
+      return Math.E;
+    }
+
+    // Function call: func(arg) or func(arg1, arg2)
+    if (["sqrt", "sin", "cos", "tan", "abs", "round", "floor", "ceil", "log", "min", "max"].includes(tok)) {
+      const funcName = this.consume();
+      this.consume("(");
+      const args: number[] = [this.parseExpr()];
+      while (this.peek() === ",") {
+        this.consume(",");
+        args.push(this.parseExpr());
+      }
+      this.consume(")");
+
+      switch (funcName) {
+        case "sqrt": return Math.sqrt(args[0]);
+        case "sin": return Math.sin(args[0]);
+        case "cos": return Math.cos(args[0]);
+        case "tan": return Math.tan(args[0]);
+        case "abs": return Math.abs(args[0]);
+        case "round": return Math.round(args[0]);
+        case "floor": return Math.floor(args[0]);
+        case "ceil": return Math.ceil(args[0]);
+        case "log": return Math.log(args[0]);
+        case "min": return Math.min(...args);
+        case "max": return Math.max(...args);
+        default: throw new Error("Unknown function");
+      }
+    }
+
+    // Number literal
+    if (/^[\d.]+$/.test(tok)) {
+      this.consume();
+      const n = parseFloat(tok);
+      if (isNaN(n)) throw new Error("Invalid number");
+      return n;
+    }
+
+    throw new Error(`Unexpected token: ${tok}`);
+  }
+
+  private parseUnary(): number {
+    if (this.peek() === "-") {
+      this.consume("-");
+      return -this.parseUnary();
+    }
+    if (this.peek() === "+") {
+      this.consume("+");
+      return this.parseUnary();
+    }
+    return this.parseExponent();
+  }
+
+  private parseExponent(): number {
+    let base = this.parsePrimary();
+    if (this.peek() === "^") {
+      this.consume("^");
+      const exp = this.parseUnary();
+      base = Math.pow(base, exp);
+    }
+    return base;
+  }
+
+  private parseMultiplicative(): number {
+    let left = this.parseUnary();
+    while (this.peek() === "*" || this.peek() === "/" || this.peek() === "%") {
+      const op = this.consume();
+      const right = this.parseUnary();
+      if (op === "*") left *= right;
+      else if (op === "/") {
+        if (right === 0) throw new Error("Division by zero");
+        left /= right;
+      } else if (op === "%") {
+        left %= right;
+      }
+    }
+    return left;
+  }
+
+  private parseAdditive(): number {
+    let left = this.parseMultiplicative();
+    while (this.peek() === "+" || this.peek() === "-") {
+      const op = this.consume();
+      const right = this.parseMultiplicative();
+      if (op === "+") left += right;
+      else if (op === "-") left -= right;
+    }
+    return left;
+  }
+
+  public parseExpr(): number {
+    return this.parseAdditive();
+  }
+
+  public evaluate(str: string): number | null {
+    this.pos = 0;
+    const tokens = this.tokenize(str);
+    if (!tokens || tokens.length === 0) return null;
+    this.tokens = tokens;
+    try {
+      const result = this.parseExpr();
+      if (this.pos < this.tokens.length) return null; // Unparsed trailing tokens
+      return isFinite(result) ? result : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
 function tryMath(q: string): InstantAnswer | null {
   const cleaned = q.toLowerCase().replace(/what\s+is|calculate|compute|=\s*\?|\?/g, "").trim();
-  // allow digits, operators, parens, decimal, spaces, and named math functions
-  if (!/^[\d\s+\-*/().%^a-z]+$/i.test(cleaned)) return null;
-  // must contain at least one operator or function call to be "math"
+  if (!cleaned || cleaned.length > 80) return null;
+
+  // Must contain at least one operator or math function to qualify as a math query
   if (!/[+\-*/%^]|sqrt|sin|cos|tan|log|abs|round|floor|ceil|pow|min|max/.test(cleaned)) return null;
 
-  try {
-    // transform ^ to **, sqrt(x) -> Math.sqrt(x), etc.
-    let expr = cleaned
-      .replace(/\^/g, "**")
-      .replace(/\bsqrt\b/g, "Math.sqrt")
-      .replace(/\bsin\b/g, "Math.sin")
-      .replace(/\bcos\b/g, "Math.cos")
-      .replace(/\btan\b/g, "Math.tan")
-      .replace(/\blog\b/g, "Math.log")
-      .replace(/\babs\b/g, "Math.abs")
-      .replace(/\bround\b/g, "Math.round")
-      .replace(/\bfloor\b/g, "Math.floor")
-      .replace(/\bceil\b/g, "Math.ceil")
-      .replace(/\bpow\b/g, "Math.pow")
-      .replace(/\bmin\b/g, "Math.min")
-      .replace(/\bmax\b/g, "Math.max")
-      .replace(/\bpi\b/g, "Math.PI")
-      .replace(/\be\b/g, "Math.E");
+  const evaluator = new SafeMathEvaluator();
+  const result = evaluator.evaluate(cleaned);
 
-    const result = Function(`"use strict"; return (${expr});`)();
-    if (typeof result === "number" && isFinite(result)) {
-      const formatted = Number.isInteger(result)
-        ? result.toLocaleString()
-        : result.toLocaleString(undefined, { maximumFractionDigits: 8 });
-      return {
-        kind: "math",
-        title: "Calculation",
-        value: formatted,
-        detail: `${cleaned} = ${formatted}`,
-      };
-    }
-  } catch {
-    /* not math */
+  if (result !== null) {
+    const formatted = Number.isInteger(result)
+      ? result.toLocaleString()
+      : result.toLocaleString(undefined, { maximumFractionDigits: 8 });
+    return {
+      kind: "math",
+      title: "Calculation",
+      value: formatted,
+      detail: `${cleaned} = ${formatted}`,
+    };
   }
   return null;
 }
@@ -142,8 +310,8 @@ function tryUnit(q: string): InstantAnswer | null {
 // --- Time ---
 function tryTime(q: string): InstantAnswer | null {
   const lower = q.toLowerCase().trim();
-  const timeMatch = lower.match(/(?:what(?:'s| is) the )?time(?:\s+in\s+(.+))?/);
-  if (!timeMatch && !/what time is it|current time/.test(lower)) return null;
+  const timeMatch = lower.match(/^(?:what(?:'s| is) the )?time(?:\s+in\s+(.+))?$/i);
+  if (!timeMatch && !/^(?:what time is it|current time)$/i.test(lower)) return null;
   const tz = timeMatch?.[1]?.trim();
   try {
     const now = new Date();
@@ -168,78 +336,49 @@ function tryTime(q: string): InstantAnswer | null {
   }
 }
 
-// --- Definition (via LLM, lightweight) ---
+// --- Definition (Free Dictionary API + LLM Cascade) ---
 async function tryDefinition(q: string): Promise<InstantAnswer | null> {
   const m = q.toLowerCase().match(/^(?:define|definition of|what does .+ mean|meaning of)\s+(.+)/);
   if (!m) return null;
   const word = m[1].replace(/\?/g, "").trim();
   if (!word || word.length > 60) return null;
 
-  try {
-    const zai = await getZai();
-    const completion = await zai.chat.completions.create({
-      messages: [
-        {
-          role: "assistant",
-          content:
-            "You are WHITE Search's instant dictionary. Define the given word in ONE clear sentence (under 30 words). No examples, no etymology, just the definition. Be precise and honest.",
-        },
-        { role: "user", content: `Define: ${word}` },
-      ],
-      thinking: { type: "disabled" },
-    });
-    const definition = (completion.choices[0]?.message?.content ?? "").trim();
-    if (!definition) return null;
+  // 1. Fast, keyless Open Dictionary API
+  const openDef = await fetchOpenDefinition(word);
+  if (openDef) {
+    const title = openDef.partOfSpeech
+      ? `Definition of "${openDef.word}" (${openDef.partOfSpeech})`
+      : `Definition of "${openDef.word}"`;
     return {
       kind: "definition",
-      title: `Definition of "${word}"`,
-      value: definition,
+      title,
+      value: openDef.definition,
+      detail: openDef.phonetic ? `Phonetic: ${openDef.phonetic}` : undefined,
     };
-  } catch {
-    return null;
   }
+
+  return null;
 }
 
-// --- Weather (via web search, parsed) ---
+// --- Weather (Open-Meteo API + Web Search Cascade) ---
 async function tryWeather(q: string): Promise<InstantAnswer | null> {
   const lower = q.toLowerCase().trim();
   const m = lower.match(/^(?:weather|temperature|forecast)(?:\s+in\s+(.+))?(?:\s+today)?$/);
   if (!m) return null;
   const location = m[1]?.trim() || "my location";
 
-  try {
-    const zai = await getZai();
-    const results = (await zai.functions.invoke("web_search", {
-      query: `weather ${location} today temperature`,
-      num: 5,
-    })) as { name?: string; snippet?: string; host_name?: string }[];
-
-    // look for a snippet that contains a temperature pattern
-    // Match temperature with explicit unit: "68°F", "20°C", "68 F", "20 C", "68 degrees F"
-    // Require the unit to avoid matching random numbers
-    const tempPattern = /(-?\d{1,3}(?:\.\d+)?)\s*(?:°|degrees?\s*)?\s*([fc])\b/i;
-    const conditionPattern = /(sunny|cloudy|overcast|rain(?:y|ing)?|snow(?:y|ing)?|clear|fog(?:gy)?|wind(?:y)?|storm(?:y)?|thunderstorm|haze|mist)/i;
-
-    for (const r of results) {
-      const text = `${r.name ?? ""} ${r.snippet ?? ""}`;
-      const tempMatch = text.match(tempPattern);
-      const condMatch = text.match(conditionPattern);
-      if (tempMatch) {
-        const unitChar = tempMatch[2].toUpperCase();
-        const temp = `${tempMatch[1]}°${unitChar}`;
-        const condition = condMatch ? condMatch[1].charAt(0).toUpperCase() + condMatch[1].slice(1) : "";
-        return {
-          kind: "weather",
-          title: `Weather in ${location}`,
-          value: temp,
-          detail: condition ? `${condition} · via ${r.host_name ?? "web"}` : `via ${r.host_name ?? "web"}`,
-        };
-      }
-    }
-    return null;
-  } catch {
-    return null;
+  // 1. Fast, keyless Open-Meteo Weather API
+  const openW = await fetchOpenWeather(location);
+  if (openW) {
+    return {
+      kind: "weather",
+      title: `Weather in ${openW.location}`,
+      value: `${openW.temperatureC}°C (${openW.temperatureF}°F)`,
+      detail: `${openW.condition}${openW.humidity ? ` · Humidity ${openW.humidity}%` : ""}${openW.windSpeedKmH ? ` · Wind ${openW.windSpeedKmH} km/h` : ""}`,
+    };
   }
+
+  return null;
 }
 
 // --- Currency conversion (via web search, parsed) ---
@@ -271,37 +410,37 @@ async function tryCurrency(q: string): Promise<InstantAnswer | null> {
     return { kind: "currency", title: "Currency conversion", value: `${amount.toLocaleString()} ${to}`, detail: `Same currency` };
   }
 
-  try {
-    const zai = await getZai();
-    const results = (await zai.functions.invoke("web_search", {
-      query: `${amount} ${from} to ${to} exchange rate`,
-      num: 3,
-    })) as { name?: string; snippet?: string; host_name?: string }[];
-
-    // Look for a converted amount in results (e.g., "100 USD = 91.23 EUR")
-    const ratePattern = /([\d,.]+)\s*(?:EUR|USD|GBP|JPY|INR|CNY|CAD|AUD|CHF|SGD)/i;
-    for (const r of results) {
-      const text = `${r.name ?? ""} ${r.snippet ?? ""}`;
-      const rateMatch = text.match(ratePattern);
-      if (rateMatch) {
-        const converted = parseFloat(rateMatch[1].replace(/,/g, ""));
-        if (!isNaN(converted) && converted > 0) {
-          return {
-            kind: "currency",
-            title: "Currency conversion",
-            value: `${converted.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${to}`,
-            detail: `${amount.toLocaleString()} ${from} = ${converted.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${to} · via ${r.host_name ?? "web"}`,
-          };
-        }
-      }
-    }
-    return null;
-  } catch {
-    return null;
+  // 1. Fast, keyless Open Exchange Rates API
+  const openRate = await fetchOpenCurrency(amount, from, to);
+  if (openRate !== null && !isNaN(openRate)) {
+    return {
+      kind: "currency",
+      title: "Currency conversion",
+      value: `${openRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${to}`,
+      detail: `${amount.toLocaleString()} ${from} = ${openRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${to} · Live Exchange Rate`,
+    };
   }
+
+  return null;
 }
 
 export async function GET(req: NextRequest) {
+  const clientIp = getClientIp(req);
+  const rate = searchRateLimiter.check(clientIp);
+  if (!rate.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded. Please slow down." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rate.reset),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(rate.reset),
+        },
+      }
+    );
+  }
+
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
   if (!q) return NextResponse.json({ answer: null });
 

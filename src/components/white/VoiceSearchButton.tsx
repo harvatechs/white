@@ -6,7 +6,7 @@ import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { useWhite } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 interface VoiceSearchButtonProps {
   onTranscript: (text: string) => void;
@@ -15,15 +15,78 @@ interface VoiceSearchButtonProps {
 }
 
 export function VoiceSearchButton({ onTranscript, size = "md", className }: VoiceSearchButtonProps) {
-  const { recording, error, start, stop, cancel } = useVoiceRecorder();
+  const { recording: isMediaRecording, error: mediaError, start: startMedia, stop: stopMedia, cancel: cancelMedia } = useVoiceRecorder();
+  const [isSpeechRecording, setIsSpeechRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const speechRecognitionRef = useRef<any>(null);
   const { toast } = useToast();
+
+  const isRecording = isSpeechRecording || isMediaRecording;
 
   const handleClick = async () => {
     if (transcribing) return;
-    if (recording) {
+
+    // Check if browser natively supports SpeechRecognition
+    const SpeechRec =
+      typeof window !== "undefined" &&
+      ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+    if (SpeechRec) {
+      if (isSpeechRecording) {
+        // Stop native speech recognition
+        if (speechRecognitionRef.current) {
+          try {
+            speechRecognitionRef.current.stop();
+          } catch {}
+        }
+        setIsSpeechRecording(false);
+        return;
+      }
+
+      try {
+        const recognition = new SpeechRec();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = typeof navigator !== "undefined" && navigator.language ? navigator.language : "en-US";
+
+        recognition.onstart = () => {
+          setIsSpeechRecording(true);
+        };
+
+        recognition.onresult = (event: any) => {
+          const transcript = event.results?.[0]?.[0]?.transcript;
+          if (transcript && transcript.trim()) {
+            onTranscript(transcript.trim());
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          setIsSpeechRecording(false);
+          if (event.error !== "no-speech" && event.error !== "aborted") {
+            toast({
+              title: "Voice recognition notice",
+              description: event.error === "not-allowed" ? "Microphone permission denied." : "Could not hear audio.",
+              variant: "destructive",
+            });
+          }
+        };
+
+        recognition.onend = () => {
+          setIsSpeechRecording(false);
+        };
+
+        speechRecognitionRef.current = recognition;
+        recognition.start();
+        return;
+      } catch {
+        // Fallback to media recorder below
+      }
+    }
+
+    // Fallback for browsers without native Web Speech API (e.g. desktop Firefox)
+    if (isMediaRecording) {
       setTranscribing(true);
-      const base64 = await stop();
+      const base64 = await stopMedia();
       setTranscribing(false);
       if (!base64) return;
       try {
@@ -42,20 +105,27 @@ export function VoiceSearchButton({ onTranscript, size = "md", className }: Voic
         toast({ title: "Voice search failed", description: "Please try again.", variant: "destructive" });
       }
     } else {
-      await start();
-      if (error) {
-        toast({ title: "Microphone unavailable", description: error, variant: "destructive" });
+      await startMedia();
+      if (mediaError) {
+        toast({ title: "Microphone unavailable", description: mediaError, variant: "destructive" });
       }
     }
   };
 
   const handleCancel = (e: React.MouseEvent) => {
     e.stopPropagation();
-    cancel();
+    if (speechRecognitionRef.current && isSpeechRecording) {
+      try {
+        speechRecognitionRef.current.abort();
+      } catch {}
+      setIsSpeechRecording(false);
+    }
+    cancelMedia();
   };
 
   const dim = size === "sm" ? "size-4" : "size-5";
   const btnDim = size === "sm" ? "size-8" : "size-9";
+  const recording = isRecording;
 
   return (
     <div className={cn("relative flex items-center", className)}>

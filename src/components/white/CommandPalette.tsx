@@ -226,14 +226,20 @@ export function CommandPalette({ onSearch, onGoHome }: CommandPaletteProps) {
   // reset on open
   useEffect(() => {
     if (open) {
-      setQuery("");
-      setActive(0);
+      setTimeout(() => {
+        setQuery("");
+        setActive(0);
+      }, 0);
     }
   }, [open]);
 
   // keep active in range
   useEffect(() => {
-    if (active >= filtered.length) setActive(0);
+    if (active >= filtered.length) {
+      setTimeout(() => {
+        setActive(0);
+      }, 0);
+    }
   }, [filtered, active]);
 
   // scroll active into view

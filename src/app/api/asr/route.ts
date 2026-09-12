@@ -1,18 +1,11 @@
-// WHITE Search — /api/asr (voice search)
-// Accepts a base64-encoded audio blob (webm/wav/mp3), transcribes it via z-ai ASR,
-// and returns the text. The client then runs the search with that text.
+// WHITE Search — /api/asr (voice search endpoint)
+// Accepts audio and transcribes via OpenAI-compatible Whisper API (if configured),
+// or guides the client to use native browser speech recognition.
 import { NextRequest, NextResponse } from "next/server";
-import ZAI from "z-ai-web-dev-sdk";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
-
-let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
-async function getZai() {
-  if (!zaiInstance) zaiInstance = await ZAI.create();
-  return zaiInstance;
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,16 +13,39 @@ export async function POST(req: NextRequest) {
     const { audio } = body as { audio?: string };
     if (!audio) return NextResponse.json({ error: "missing audio" }, { status: 400 });
 
-    // strip data URI prefix if present
-    const base64 = audio.replace(/^data:audio\/\w+;base64,/, "");
-    const zai = await getZai();
-    const response = (await zai.audio.asr.create({ file_base64: base64 })) as { text?: string };
-    const text = (response.text ?? "").trim();
-    if (!text) return NextResponse.json({ error: "Nothing heard. Try again." }, { status: 422 });
-    return NextResponse.json({ text });
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (apiKey) {
+      try {
+        const base64 = audio.replace(/^data:audio\/\w+;base64,/, "");
+        const buffer = Buffer.from(base64, "base64");
+        const blob = new Blob([buffer], { type: "audio/webm" });
+        const formData = new FormData();
+        formData.append("file", blob, "audio.webm");
+        formData.append("model", "whisper-1");
+
+        const baseUrl = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+        const res = await fetch(`${baseUrl}/audio/transcriptions`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}` },
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const text = (data.text || "").trim();
+          if (text) return NextResponse.json({ text });
+        }
+      } catch (whisperErr) {
+        console.warn("[/api/asr] Whisper transcription failed:", whisperErr);
+      }
+    }
+
+    return NextResponse.json(
+      { error: "Server speech transcription requires OPENAI_API_KEY. Please use browser speech recognition." },
+      { status: 503 }
+    );
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "transcription failed";
-    console.error("[/api/asr] error", e);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

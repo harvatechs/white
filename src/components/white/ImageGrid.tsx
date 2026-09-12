@@ -33,7 +33,9 @@ export function ImageGrid({ items, loading, query }: ImageGridProps) {
   useEffect(() => {
     if (!query.trim()) return;
     let active = true;
-    setImgLoading(true);
+    setTimeout(() => {
+      if (active) setImgLoading(true);
+    }, 0);
     (async () => {
       try {
         const r = await fetch(`/api/images?q=${encodeURIComponent(query)}`);

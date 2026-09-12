@@ -20,7 +20,6 @@ const SHORTCUTS: { keys: string[]; label: string; group: string }[] = [
   { keys: ["o"], label: "Open focused result in new tab", group: "Results" },
   { keys: ["n"], label: "Next page of results", group: "Results" },
   { keys: ["p"], label: "Previous page of results", group: "Results" },
-  { keys: ["g", "h"], label: "Go home", group: "Navigation" },
   { keys: ["g", "s"], label: "Open Customize", group: "Navigation" },
   { keys: ["g", "a"], label: "Open About", group: "Navigation" },
   { keys: ["g", "b"], label: "Open Bookmarks", group: "Navigation" },

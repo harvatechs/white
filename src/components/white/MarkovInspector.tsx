@@ -37,7 +37,11 @@ export function MarkovInspector() {
   }, []);
 
   useEffect(() => {
-    if (open) load(token);
+    if (open) {
+      setTimeout(() => {
+        load(token);
+      }, 0);
+    }
   }, [open, token, load]);
 
   const reset = async () => {

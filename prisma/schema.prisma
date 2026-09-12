@@ -10,15 +10,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Search history — every query the user runs (for recall + Markov learning)
+// Search history — every query the user runs (scoped by anonymous sessionId)
 model SearchHistory {
   id        String   @id @default(cuid())
+  sessionId String   @default("")
   query     String
   category  String   @default("web") // web | news | images | videos
   resultsCount Int   @default(0)
   clicked   Boolean  @default(false) // did the user open a result?
   createdAt DateTime @default(now())
 
+  @@index([sessionId])
   @@index([query])
   @@index([createdAt])
 }
@@ -26,6 +28,7 @@ model SearchHistory {
 // A click on a search result — feeds the Markov relevance model
 model SearchClick {
   id        String   @id @default(cuid())
+  sessionId String   @default("")
   query     String
   url       String
   title     String
@@ -34,6 +37,7 @@ model SearchClick {
   category  String   @default("web")
   createdAt DateTime @default(now())
 
+  @@index([sessionId])
   @@index([query])
   @@index([host])
 }
@@ -76,6 +80,15 @@ model Preferences {
   accent        String   @default("graphite") // graphite | sage | rose | amber | slate
   customAccent  String?  // hex color override, null = use preset
   searchAlgorithm String @default("relevance") // relevance | recency | diverse | markov | alphabetical
+  searchProvider  String   @default("ddg") // ddg | google | searxng
+  searxngInstance String   @default("https://searx.be")
+  localFirst      Boolean  @default(true)
+  weightRecency   Int      @default(0)
+  weightDiversity Int      @default(0)
+  weightPersonal  Int      @default(0)
+  spamFilter      Boolean  @default(true)
+  customBangs     String?  @default("[]")
+  customSpamDomains String? @default("[]")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }

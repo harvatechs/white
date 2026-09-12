@@ -42,7 +42,11 @@ export function HistoryTimeline({ onPick }: HistoryTimelineProps) {
   }, []);
 
   useEffect(() => {
-    if (open) load();
+    if (open) {
+      setTimeout(() => {
+        load();
+      }, 0);
+    }
   }, [open, load]);
 
   const filtered = useMemo(() => {

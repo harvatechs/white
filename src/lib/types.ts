@@ -65,6 +65,15 @@ export interface UserPreferences {
   accent: AccentName;
   customAccent: string | null; // hex color, overrides accent when set
   searchAlgorithm: SearchAlgorithm;
+  searchProvider: "ddg" | "searxng" | "local";
+  searxngInstance: string;
+  localFirst: boolean;
+  weightRecency: number;
+  weightDiversity: number;
+  weightPersonal: number;
+  spamFilter: boolean;
+  customBangs?: { prefix: string; name: string; urlTemplate: string }[];
+  customSpamDomains?: string[];
 }
 
 export interface HistoryItem {

@@ -4,17 +4,11 @@
 // web search suggestions.
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import ZAI from "z-ai-web-dev-sdk";
+import { fetchOpenSuggestions } from "@/lib/open-apis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
-
-let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
-async function getZai() {
-  if (!zaiInstance) zaiInstance = await ZAI.create();
-  return zaiInstance;
-}
 
 export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
@@ -57,30 +51,22 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 2) Only do web search if we don't have enough from Markov/history
-    // This avoids the slow 2-3s web search call when we already have good data
+    // 2) Fallback to open suggestions + web search if needed
     if (related.length < 4) {
       try {
-        const zai = await getZai();
-        const searchResults = (await zai.functions.invoke("web_search", {
-          query: q,
-          num: 5,
-        })) as { name?: string; snippet?: string }[];
-        for (const r of searchResults.slice(0, 3)) {
-          const title = r.name ?? "";
-          const vsMatch = title.match(/vs\.?\s+([A-Za-z0-9\s]+)/i);
-          if (vsMatch) {
-            const candidate = `${q} vs ${vsMatch[1].trim().split(/\s+/).slice(0, 3).join(" ")}`.toLowerCase();
-            if (!seen.has(candidate)) {
-              seen.add(candidate);
-              related.push({ text: candidate, source: "web" });
-            }
+        const openSug = await fetchOpenSuggestions(q, 6);
+        for (const item of openSug) {
+          const lower = item.toLowerCase();
+          if (!seen.has(lower) && lower !== q.toLowerCase()) {
+            seen.add(lower);
+            related.push({ text: item, source: "popular" });
+            if (related.length >= 6) break;
           }
         }
-      } catch {
-        // web search is best-effort — rate limits are expected
-      }
+      } catch {}
     }
+
+
 
     const response = NextResponse.json({ related: related.slice(0, 8) });
     response.headers.set("Cache-Control", "public, max-age=120, s-maxage=300");

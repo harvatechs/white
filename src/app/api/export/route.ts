@@ -28,6 +28,7 @@ export async function GET() {
       : { ...DEFAULT_PREFS, sessionId: undefined };
 
     const history = await db.searchHistory.findMany({
+      where: { sessionId },
       orderBy: { createdAt: "desc" },
       take: 500,
       select: { query: true, category: true, resultsCount: true, createdAt: true },
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
 
     if (Array.isArray(history)) {
       // import up to 200 most recent, skip dupes of last 20
-      const recent = await db.searchHistory.findMany({ orderBy: { createdAt: "desc" }, take: 20, select: { query: true, category: true } });
+      const recent = await db.searchHistory.findMany({ where: { sessionId }, orderBy: { createdAt: "desc" }, take: 20, select: { query: true, category: true } });
       const seen = new Set(recent.map((r) => `${r.query}|${r.category}`));
       let n = 0;
       for (const h of history.slice(0, 200)) {
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest) {
         seen.add(key);
         await db.searchHistory.create({
           data: {
+            sessionId,
             query: String(h.query ?? ""),
             category: String(h.category ?? "web"),
             resultsCount: Number(h.resultsCount ?? 0),

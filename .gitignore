@@ -30,14 +30,27 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (allow .env.example)
 .env*
+!.env.example
 
-# vercel
+# database
+db/*.db
+db/*.db-shm
+db/*.db-wal
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# downloads & test screenshots
+download/
+downloads/
+
+# vercel & docker
 .vercel
 
-
-# typescript
+# typescript & build
 *.tsbuildinfo
 next-env.d.ts
 local-*
@@ -46,9 +59,12 @@ local-*
 *.log
 dev.log
 dev.out.log
+server.log
 test
 prompt
 
-server.log
-# Skills directory
+# skills & sandbox scripts
 /skills/
+.zscripts/
+worklog.md
+bun.lock

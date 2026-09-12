@@ -54,7 +54,11 @@ export function StatsDialog() {
   }, []);
 
   useEffect(() => {
-    if (open) load();
+    if (open) {
+      setTimeout(() => {
+        load();
+      }, 0);
+    }
   }, [open, load]);
 
   const maxDay = Math.max(...(data?.days.map((d) => d.count) ?? [0]), 1);
